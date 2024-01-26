@@ -1,9 +1,10 @@
-
+// import HEditor from 'components/editor/HEditor'
+import CesiumBuildingTexture from "examples/CesiumBuildingTexture";
 
 function App() {
   return (
     <main>
-      <h1>HEditor</h1>
+      <CesiumBuildingTexture />
     </main>
   );
 }

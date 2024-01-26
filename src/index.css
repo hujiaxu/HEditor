@@ -15,7 +15,7 @@
   }
 
   main {
-    @apply px-4 min-h-screen sm:px-0 space-y-16 w-full bg-gray-900 text-white;
+    @apply px-4 h-screen sm:px-0 space-y-16 w-full overflow-y-hidden bg-gray-900 text-white;
     background-image: radial-gradient(
         hsla(0, 0%, 84.3%, 0.25) 1px,
         transparent 0
@@ -26,4 +26,24 @@
     -webkit-animation: slide 2s linear infinite;
     animation: slide 4s linear infinite;
   }
+}
+
+#map {
+  width: 85%;
+  height: 85%;
+  border: 0px;
+  padding: 0px;
+}
+#info iframe {
+  border: none;
+}
+.ol-scale-value {
+  top: 24px;
+  right: 8px;
+  position: absolute;
+}
+.ol-zoom-value {
+  top: 40px;
+  right: 8px;
+  position: absolute;
 }
