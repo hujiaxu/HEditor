@@ -1,9 +1,9 @@
-
+import HEditor from "pages/HEditor";
 
 function App() {
   return (
     <main>
-      <h1>HEditor</h1>
+      <HEditor />
     </main>
   );
 }
