@@ -25,7 +25,8 @@
       "components/*": ["src/components/*"],
       "hooks/*": ["src/hooks/*"],
       "pages/*": ["src/pages/*"],
-      "renderer/*": ["src/renderer/*"]
+      "renderer/*": ["src/renderer/*"],
+      "types/*": ["src/types/*"]
     }
   },
   "include": ["src"],

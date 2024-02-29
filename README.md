@@ -8,8 +8,6 @@ Mocking up web app with <b>HEditor</b><sup><em>(speed)</em></sup><br>
 
 <br>
 
-
-
 ### Coding Style
 
 - [ESLint](https://eslint.org/) - configured for React/Hooks & TypeScript
@@ -20,7 +18,6 @@ Mocking up web app with <b>HEditor</b><sup><em>(speed)</em></sup><br>
 - [TypeScript](https://www.typescriptlang.org/)
 - [Commit lint](https://github.com/conventional-changelog/commitlint) - helps your team adhering to a commit convention
 - [Netlify](https://www.netlify.com/) - zero-config deployment
-
 
 ### Development
 
@@ -37,7 +34,6 @@ To build the App, run
 ```bash
 yarn build
 ```
-
 
 ### Issues
 
