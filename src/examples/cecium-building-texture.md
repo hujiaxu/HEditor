@@ -80,10 +80,10 @@ url: 'https://seopic.699pic.com/photo/40250/3918.jpg_wh1200.jpg'
 type: Cesium.UniformType.SAMPLER_2D
 }
 },
-vertexShaderText: `          void vertexMain(VertexInput vsInput, inout czm_modelVertexOutput vsOutput) {
+vertexShaderText: `         void vertexMain(VertexInput vsInput, inout czm_modelVertexOutput vsOutput) {
             v_normalMC = vsInput.attributes.normalMC;
           }
-       `,
+      `,
 fragmentShaderText: `
 void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
 vec3 positionMC = fsInput.attributes.positionMC;
@@ -128,10 +128,10 @@ url: 'https://seopic.699pic.com/photo/40250/3637.jpg_wh1200.jpg'
 type: Cesium.UniformType.SAMPLER_2D
 }
 },
-vertexShaderText: `          void vertexMain(VertexInput vsInput, inout czm_modelVertexOutput vsOutput) {
+vertexShaderText: `         void vertexMain(VertexInput vsInput, inout czm_modelVertexOutput vsOutput) {
             v_normalMC = vsInput.attributes.normalMC;
           }
-       `,
+      `,
 fragmentShaderText: `
 void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
 vec3 positionMC = fsInput.attributes.positionMC;
@@ -175,10 +175,10 @@ url: 'https://seopic.699pic.com/photo/40108/1832.jpg_wh1200.jpg'
 type: Cesium.UniformType.SAMPLER_2D
 }
 },
-vertexShaderText: `          void vertexMain(VertexInput vsInput, inout czm_modelVertexOutput vsOutput) {
+vertexShaderText: `         void vertexMain(VertexInput vsInput, inout czm_modelVertexOutput vsOutput) {
             v_normalMC = vsInput.attributes.normalMC;
           }
-       `,
+      `,
 fragmentShaderText: `
 void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
 vec3 positionMC = fsInput.attributes.positionMC;
