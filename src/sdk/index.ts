@@ -44,8 +44,11 @@ export default class SDK {
   private leftUp() {
     
   }
-  private leftClick() {
+  private leftClick({ position }: { position: Cesium.Cartesian2 }) {
+    // if (!this.drawer) return
 
+    const pos = this.viewer.scene.pickPosition(position)
+    console.log('pos: ', pos);
   }
 
   private leftDoubleClick() {

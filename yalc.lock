@@ -1,0 +1,9 @@
+{
+  "version": "v1",
+  "packages": {
+    "cesium-transformer": {
+      "version": "1.0.1",
+      "signature": "2aedd9221d4b0aa816a3b8aaf1634324"
+    }
+  }
+}

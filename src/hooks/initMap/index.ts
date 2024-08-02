@@ -53,9 +53,7 @@ export default async function mapviewInit({
     ...extendConf,
   });
 
-  const terrainLayer = new Cesium.EllipsoidTerrainProvider({});
   viewer.scene.terrainProvider = new Cesium.EllipsoidTerrainProvider({});
-  window.terrainProvider = terrainLayer;
 
   viewer.scene.postProcessStages.fxaa.enabled = true;
 

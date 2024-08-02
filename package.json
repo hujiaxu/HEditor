@@ -34,7 +34,7 @@
     "yarn": ">=1.22.5"
   },
   "scripts": {
-    "dev": "vite --host",
+    "dev": "vite --host --open",
     "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
@@ -45,6 +45,7 @@
     "@heroicons/react": "2.0.18",
     "axios": "^1.6.7",
     "cesium": "^1.114.0",
+    "cesium-transformer": "^1.0.1",
     "cesiumvectortile": "^1.2.4",
     "dat.gui": "^0.7.9",
     "mobx": "^6.12.3",
