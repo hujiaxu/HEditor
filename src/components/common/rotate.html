@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cesium 旋转动画示例</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.120/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.120/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    html,
+    body,
+    #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="cesiumContainer"></div>
+  <script>
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      baseLayerPicker: false
+    });
+
+
+    // 创建立方体几何体
+    function createCubeGeometry(size) {
+      const halfSize = size / 2;
+      const boundingSphere = Cesium.BoundingSphere.fromVertices([
+          -halfSize, -halfSize, halfSize,
+          halfSize, -halfSize, halfSize,
+          halfSize, halfSize, halfSize,
+          -halfSize, halfSize, halfSize,
+          -halfSize, -halfSize, -halfSize,
+          halfSize, -halfSize, -halfSize,
+          halfSize, halfSize, -halfSize,
+          -halfSize, halfSize, -halfSize
+        ])
+        // console.log('boundingSphere: ', boundingSphere)
+      return new Cesium.Geometry({
+        attributes: {
+          position: new Cesium.GeometryAttribute({
+            componentDatatype: Cesium.ComponentDatatype.DOUBLE,
+            componentsPerAttribute: 3,
+            values: new Float64Array([
+              -halfSize, -halfSize, halfSize,
+              halfSize, -halfSize, halfSize,
+              halfSize, halfSize, halfSize,
+              -halfSize, halfSize, halfSize,
+              -halfSize, -halfSize, -halfSize,
+              halfSize, -halfSize, -halfSize,
+              halfSize, halfSize, -halfSize,
+              -halfSize, halfSize, -halfSize
+            ])
+          }),
+          normal: new Cesium.GeometryAttribute({
+            componentDatatype: Cesium.ComponentDatatype.FLOAT,
+            componentsPerAttribute: 3,
+            values: new Float32Array([
+              0, 0, 1,
+              0, 0, 1,
+              0, 0, 1,
+              0, 0, 1,
+              0, 0, -1,
+              0, 0, -1,
+              0, 0, -1,
+              0, 0, -1
+            ])
+          })
+        },
+        indices: new Uint16Array([
+          0, 1, 2, 0, 2, 3,
+          4, 5, 6, 4, 6, 7,
+          0, 1, 5, 0, 5, 4,
+          2, 3, 7, 2, 7, 6,
+          0, 3, 7, 0, 7, 4,
+          1, 2, 6, 1, 6, 5
+        ]),
+        primitiveType: Cesium.PrimitiveType.TRIANGLES,
+        boundingSphere
+      });
+    }
+
+
+    const cubeGeometry = createCubeGeometry(1000000); // 创建一个边长为 1km 的立方体几何体
+    
+
+    const center = Cesium.Cartesian3.fromDegrees(-115.0, 37.0)
+    // 初始模型矩阵
+    let modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(center);
+
+    // 创建几何体实例
+    const geometryInstance = new Cesium.GeometryInstance({
+      geometry: cubeGeometry,
+      modelMatrix: modelMatrix,
+      attributes: {
+        color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.BLUE)
+      }
+    });
+
+    // 创建 Primitive
+    const primitive = new Cesium.Primitive({
+      geometryInstances: geometryInstance,
+      appearance: new Cesium.PerInstanceColorAppearance({
+        flat: true,
+        renderState: {
+          depthTest: {
+            enabled: true
+          }
+        }
+      })
+    });
+
+    // 将 Primitive 添加到场景中
+    viewer.scene.primitives.add(primitive);
+
+    // 设置视角
+    // viewer.zoomTo(viewer.scene.primitives);
+    // viewer.camera.flyToBoundingSphere(cubeGeometry.boundingSphere, {
+    //       duration: 1,
+    //       offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-30), 60),
+    //     })
+    const rotationSpeed = 0.1;
+    let angle = 10
+    const matrix = Cesium.Matrix4.IDENTITY.clone()
+    const animate = () => {
+      // angle += rotationSpeed;
+      // 绕中心轴旋转的矩阵计算
+      // const rotationMatrix = Cesium.Matrix3.fromRotationZ(Cesium.Math.toRadians(angle));
+      // const translationMatrix = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.ZERO);// 每帧旋转1度，平移中心点
+      // modelMatrix = Cesium.Matrix4.multiply(translationMatrix, Cesium.Matrix4.fromRotationTranslation(rotationMatrix, Cesium.Cartesian3.ZERO, new Cesium.Matrix4), new Cesium.Matrix4());
+ 
+      const rotationMatrix = Cesium.Matrix3.fromRotationZ(Cesium.Math.toRadians(angle));
+
+      const translationToCenter = Cesium.Matrix4.fromTranslation(center);
+      // 旋转
+      const rotation = Cesium.Matrix4.fromRotationTranslation(rotationMatrix);
+      // 平移回原位置
+      const translationBack = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.negate(center, new Cesium.Cartesian3()));
+
+      // 组合变换矩阵
+      Cesium.Matrix4.multiply(matrix, translationToCenter, matrix);
+      Cesium.Matrix4.multiply(matrix, rotation, matrix);
+      Cesium.Matrix4.multiply(matrix, translationBack, matrix);
+      primitive.modelMatrix = matrix;
+    }
+    viewer.clock.onTick.addEventListener(animate);
+  </script>
+</body>
+
+</html>

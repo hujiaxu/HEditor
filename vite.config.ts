@@ -14,6 +14,7 @@ export default defineConfig((configEnv) => {
     plugins: [react(), cesium()],
     server: {
       port: 3000,
+      hmr: true
     },
     test: {
       globals: true,

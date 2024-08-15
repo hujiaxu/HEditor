@@ -29,6 +29,12 @@ const createPolygon = (positions?: Cesium.Cartesian3[], color = Cesium.Color.RED
   if (!positions) {
     positions = pos
   }
+  const modelMatrix = Cesium.Matrix4.IDENTITY.clone()
+  Cesium.Matrix4.multiply(
+    modelMatrix,
+    Cesium.Matrix4.fromTranslation(new Cesium.Cartesian3(0, 0, 2)),
+    modelMatrix
+  )
   const polygonInstance = new Cesium.GeometryInstance({
     geometry: new Cesium.PolygonGeometry({
       polygonHierarchy: new Cesium.PolygonHierarchy(positions),
@@ -39,6 +45,7 @@ const createPolygon = (positions?: Cesium.Cartesian3[], color = Cesium.Color.RED
         color.withAlpha(0.3),
       ),
     },
+    modelMatrix,
     id: 'polygon',
   });
 
@@ -51,20 +58,16 @@ const createPolygon = (positions?: Cesium.Cartesian3[], color = Cesium.Color.RED
       }),
   });
 
-  const matrix = Cesium.Matrix4.fromTranslation(
-    new Cesium.Cartesian3(0, 0, 0.1),
-    new Cesium.Matrix4(),
-  );
-
   const primitive = new Cesium.Primitive({
     geometryInstances: polygonInstance,
     appearance: polygonAppearance,
-    depthFailAppearance: polygonAppearance,
+    // depthFailAppearance: polygonAppearance,
     releaseGeometryInstances: false,
-    modelMatrix: matrix,
+    // modelMatrix
   });
 
   return primitive
+  
 }
 
 const BaseMap = () => {
@@ -80,19 +83,24 @@ const BaseMap = () => {
 
       const tileset = await loadCesium3dTileset(viewer, tilesetUrl);
 
-      flyToTarget(viewer, tileset);
+      // flyToTarget(viewer, tileset);
 
       const polygon = createPolygon()
       if (viewer) {
         const element = viewer.scene.primitives.add(polygon)
         const boundingSphere = Cesium.BoundingSphere.fromPoints(pos)
 
-        const transformer = new Transformer({
+        new Transformer({
           scene: viewer.scene,
-          element,
-          boundingSphere
+          element: tileset,
+          boundingSphere: tileset.boundingSphere
         })
-        console.log(transformer)
+
+        viewer.camera.flyToBoundingSphere(boundingSphere, {
+          duration: 1,
+          offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-30), 60),
+        })
+        // console.log(transformer)
 
       }
     };
