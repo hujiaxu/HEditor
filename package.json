@@ -45,7 +45,7 @@
     "@heroicons/react": "2.0.18",
     "axios": "^1.6.7",
     "cesium": "^1.120.0",
-    "cesium-transformer": "workspace:^1.0.0",
+    "cesium-transformer": "1.0.5",
     "cesiumvectortile": "^1.2.4",
     "dat.gui": "^0.7.9",
     "mobx": "^6.12.3",
