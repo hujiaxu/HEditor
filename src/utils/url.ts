@@ -11,3 +11,7 @@ export const getSvgContent = async (url: string) => {
 export const getTilesetUrl = async (id: string) => {
   return new URL(`../../public/${id}/3dtiles.json`, import.meta.url).href;
 };
+
+export const getModelUrl = async (name: string) => {
+  return new URL(`../../public/models/${name}/${name}.glb`, import.meta.url).href;
+}

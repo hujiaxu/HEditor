@@ -30,3 +30,18 @@ export const loadCesium3dTileset = async (
   tileset.maximumScreenSpaceError = 2;
   return tileset;
 };
+
+export const loadModel = async (
+  viewer: Cesium.Viewer,
+  url: string,
+  boundingSphere: Cesium.BoundingSphere
+) => {
+  const model = await Cesium.Model.fromGltfAsync({
+    url,
+    modelMatrix: Cesium.Transforms.eastNorthUpToFixedFrame(
+      boundingSphere.center
+    ),
+  });
+  viewer.scene.primitives.add(model);
+  return model;
+};

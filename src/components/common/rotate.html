@@ -27,11 +27,11 @@
       baseLayerPicker: false
     });
 
-
+    let boundingSphere = undefined
     // 创建立方体几何体
     function createCubeGeometry(size) {
       const halfSize = size / 2;
-      const boundingSphere = Cesium.BoundingSphere.fromVertices([
+      boundingSphere = Cesium.BoundingSphere.fromVertices([
           -halfSize, -halfSize, halfSize,
           halfSize, -halfSize, halfSize,
           halfSize, halfSize, halfSize,

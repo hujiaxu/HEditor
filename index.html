@@ -10,5 +10,60 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <script id="vertexShaderSource" type="x-shader/x-vertex">
+      // 自定义 Shader 使用的材质
+      in vec3 position3DHigh;
+      in vec3 position3DLow;
+      in vec3 normal;
+      in vec2 st;
+      in float batchId;
+      in vec4 color;
+
+
+      // 自定义矩阵的列向量
+      in vec4 matrixColumn0;
+      in vec4 matrixColumn1;
+      in vec4 matrixColumn2;
+      in vec4 matrixColumn3;
+
+      in vec4 translation;
+
+      out vec3 v_positionEC;
+      out vec3 v_normalEC;
+      out vec2 v_st;
+      out vec4 v_color;
+
+      void main() {
+        vec4 translationIdentity = vec4(1.0, 1.0, 1.0, 1.0);
+        vec4 p = czm_computePosition();
+        mat4 identityMatrix = mat4(2.0);
+
+        // 重新组装模型矩阵
+        mat4 modelMatrix = mat4(matrixColumn0, matrixColumn1, matrixColumn2, matrixColumn3);
+
+        v_positionEC = (czm_modelViewRelativeToEye * p).xyz;      // position in eye coordinates
+        v_normalEC = czm_normal * normal;                         // normal in eye coordinates
+        v_st = st;
+        v_color = color;
+
+        gl_Position = czm_modelViewProjectionRelativeToEye *  p;
+      }
+    </script>
+
+    <script id="fragmentShaderSource" type="x-shader/x-fragment">
+
+      precision mediump float;
+      in vec3 v_positionEC;
+      in vec2 v_st;
+      in vec4 v_color;
+      
+  
+  
+      void main() {
+          // 简单的颜色渲染
+          out_FragColor = v_color;
+      }
+    </script>
   </body>
 </html>

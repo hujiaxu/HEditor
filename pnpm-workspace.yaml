@@ -1,2 +1,2 @@
-# packages:
-#   - '../cesium-transformer'
+packages:
+  - '../cesium-transformer'
