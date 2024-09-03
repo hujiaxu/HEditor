@@ -47,7 +47,7 @@
     "@loaders.gl/gltf": "^4.2.2",
     "axios": "^1.7.4",
     "cesium": "^1.116.0",
-    "cesium-transformer": "workspace:^1.0.7",
+    "cesium-transformer": "1.0.10",
     "cesiumvectortile": "^1.2.4",
     "dat.gui": "^0.7.9",
     "fs": "0.0.1-security",

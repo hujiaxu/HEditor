@@ -33,7 +33,7 @@ const createPolygon = (positions?: Cesium.Cartesian3[], color = Cesium.Color.RED
   const modelMatrix = Cesium.Matrix4.IDENTITY.clone()
   Cesium.Matrix4.multiply(
     modelMatrix,
-    Cesium.Matrix4.fromTranslation(new Cesium.Cartesian3(0, 0, 2)),
+    Cesium.Matrix4.fromTranslation(new Cesium.Cartesian3(0, 0, 0)),
     modelMatrix
   )
   const polygonInstance = new Cesium.GeometryInstance({
@@ -46,7 +46,7 @@ const createPolygon = (positions?: Cesium.Cartesian3[], color = Cesium.Color.RED
         color.withAlpha(0.3),
       ),
     },
-    modelMatrix,
+    // modelMatrix,
     id: 'polygon',
   });
 
@@ -89,7 +89,8 @@ const BaseMap = () => {
 
 
 
-      // const polygon = createPolygon()
+      const polygon = createPolygon()
+      console.log('polygon: ', polygon);
       if (viewer) {
         // const tilesetUrl = await getTilesetUrl("1217138133700055040");
   
@@ -102,9 +103,18 @@ const BaseMap = () => {
         //   boundingSphere: tileset.boundingSphere
         // })
         const boundingSphere = Cesium.BoundingSphere.fromPoints(pos)
-        const { primitives, cachedGeometryInstances} = await extractGltfData('modelDraco_100000', viewer);
+        // const modelUrl = await getModelUrl('electric');
+        // const model = await loadModel(viewer, modelUrl, boundingSphere)
+        // console.log('model: ', model);
+        const { primitives, cachedGeometryInstances} = await extractGltfData('electric', viewer);
+        console.log('primitives: ', primitives);
         primitives.forEach(primitive => {
+          const rotationX = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(90))
+          const rotationZ = Cesium.Matrix3.fromRotationY(Cesium.Math.toRadians(90))
           primitive.modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(boundingSphere.center)
+
+          Cesium.Matrix4.multiplyByMatrix3(primitive.modelMatrix, rotationX, primitive.modelMatrix)
+          Cesium.Matrix4.multiplyByMatrix3(primitive.modelMatrix, rotationZ, primitive.modelMatrix)
           viewer.scene.primitives.add(primitive)
         })
 
@@ -114,12 +124,12 @@ const BaseMap = () => {
           if (object && object.primitive instanceof Cesium.Primitive) {
             const primitive = object.primitive as Cesium.Primitive
             const instanceAttributes = primitive.getGeometryInstanceAttributes(object.id as number)
-            console.log('instanceAttributes: ',instanceAttributes, instanceAttributes.color, instanceAttributes.boundingSphere);
             const pickId = object.id as number
             const pickInstance = (cachedGeometryInstances[0] as Cesium.GeometryInstance[]).find(instance => instance.id === pickId)
             const isExtiedElement = cachedElementsInstance.findIndex(instance => instance.id === pickId)
+            console.log('instanceAttributes.boundingSphere: ', instanceAttributes.boundingSphere, boundingSphere);
 
-            const modelMatrix = isExtiedElement !== -1 ? elements[isExtiedElement].modelMatrix : Cesium.Transforms.eastNorthUpToFixedFrame(boundingSphere.center)
+            const modelMatrix = isExtiedElement !== -1 ? elements[isExtiedElement].modelMatrix : primitive.modelMatrix.clone()
             if (isExtiedElement === -1) {
               Cesium.Matrix4.multiply(
                 modelMatrix,
@@ -140,21 +150,10 @@ const BaseMap = () => {
               elements.push(element)
               viewer.scene.primitives.add(element)
 
-              
-              // const copyInstances = differenceBy(cachedGeometryInstances[0], [...cachedElementsInstance, ...deleteInstances], 'id');
-  
-              // const newPrimitive = new Cesium.Primitive({
-              //   ...primitive,
-              //   asynchronous: false,
-              //   geometryInstances: copyInstances,
-              // })
-              // viewer.scene.primitives.remove(primitive)
-              // viewer.scene.primitives.add(newPrimitive)
               instanceAttributes.show = Cesium.ShowGeometryInstanceAttribute.toValue(false)
             }
             
 
-            const elementBoundingSpere = new Cesium.BoundingSphere(Cesium.Matrix4.getTranslation(modelMatrix, new Cesium.Cartesian3()), boundingSphere.radius)
             if (transformer) {
               transformer.destory()
               transformer = undefined
@@ -202,9 +201,6 @@ const BaseMap = () => {
 
           }
         }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
-        // const modelUrl = await getModelUrl('modelDraco');
-        // const model = await loadModel(viewer, modelUrl, boundingSphere)
-        // console.log('model: ', model);
 
         // model.readyEvent.addEventListener(() => {
           // new Transformer({
@@ -214,6 +210,12 @@ const BaseMap = () => {
           // })
         // })
 
+        // viewer.scene.primitives.add(polygon)
+        // new Transformer({
+        //   scene: viewer.scene,
+        //   element: polygon,
+        //   boundingSphere: boundingSphere
+        // })
         viewer.camera.flyToBoundingSphere(boundingSphere, {
           duration: 1,
           offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-30), 60),

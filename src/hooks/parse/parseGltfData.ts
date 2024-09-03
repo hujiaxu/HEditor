@@ -79,8 +79,10 @@ export const extractGltfData = async (name, viewer: Cesium.Viewer) => {
 
     accessorsData[i] = values;
   }
+  console.log('accessorsData: ', accessorsData);
 
   const extractNodes = loadNodes(nodes, meshes)
+  console.log('extractNodes: ', extractNodes);
 
   return loadPrimitives(extractNodes, accessorsData, viewer)
 
@@ -122,13 +124,16 @@ const loadPrimitives = (extractNodes, accessorsData, viewer) => {
 
   const primitives: Cesium.Primitive[] = []
   const cachedGeometryInstances: (Cesium.GeometryInstance[])[] = []
+  const normalData = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]
 
   for (const extractNode of extractNodes) {
     const attributes = extractNode.attributes
     const indices = new Uint16Array(accessorsData[attributes.indices])
     const position = setAttributes(new Float64Array(accessorsData[attributes.POSITION]), 3, Cesium.ComponentDatatype.DOUBLE) // attributes.POSITION
-    const normal = setAttributes(new Float32Array(accessorsData[attributes.NORMAL]), 3, Cesium.ComponentDatatype.FLOAT) // attributes.NORMAL
-    const translationData = accessorsData[attributes.TRANSLATION]
+    const normal = setAttributes(new Float32Array(normalData), 3, Cesium.ComponentDatatype.FLOAT) // attributes.NORMAL
+    const translationData = attributes.TRANSLATION instanceof Array ? attributes.TRANSLATION : accessorsData[attributes.TRANSLATION]
+    const scaleData = attributes.SCALE instanceof Array ? attributes.SCALE : accessorsData[attributes.SCALE]
+    const rotationData = attributes.ROTATION instanceof Array ? attributes.ROTATION : accessorsData[attributes.ROTATION]
 
     const geometryAttribute: any = {
       position,
@@ -143,39 +148,47 @@ const loadPrimitives = (extractNodes, accessorsData, viewer) => {
       primitiveType: Cesium.PrimitiveType.TRIANGLES,
     })
 
-    const geometryInstances = loadGeometryInstances(geometry, translationData)
+    const geometryInstances = loadGeometryInstances(geometry, translationData, scaleData, rotationData)
 
     const primitive = new Cesium.Primitive({
       geometryInstances,
-      appearance: new Cesium.MaterialAppearance({
-        material: new Cesium.Material({
-          fabric: {
-            type: 'Color',
-            // type: 'PolylinePulseLink',
-            uniforms: {
-              color: Cesium.Color.BLUE
-            },
-            // source: `czm_material czm_getMaterial(czm_materialInput materialInput) {
-            //   czm_material material = czm_getDefaultMaterial(materialInput);
-            //   material.diffuse = vec3(0.8, 0.2, 0.1);
-            //   material.specular = 3.0;
-            //   material.shininess = 0.8;
-            //   material.alpha = 0.6;
-            //   return material;
-            // }`
-          },
-          
-        }),
-        vertexShaderSource: document.getElementById('vertexShaderSource')!.textContent as string,
-        fragmentShaderSource: document.getElementById('fragmentShaderSource')!.textContent as string,
-        
+      appearance: new Cesium.PerInstanceColorAppearance({
+        flat: true,
         renderState: {
           depthTest: {
             enabled: true
           }
         }
       }),
-      shadows: Cesium.ShadowMode.CAST_ONLY,
+      // appearance: new Cesium.MaterialAppearance({
+        // material: new Cesium.Material({
+        //   fabric: {
+        //     type: 'Color',
+        //     // type: 'PolylinePulseLink',
+        //     uniforms: {
+        //       color: Cesium.Color.BLUE
+        //     },
+        //     source: `czm_material czm_getMaterial(czm_materialInput materialInput) {
+        //       czm_material material = czm_getDefaultMaterial(materialInput);
+        //       material.diffuse = vec3(0.8, 0.2, 0.1);
+        //       material.specular = 3.0;
+        //       material.shininess = 0.8;
+        //       material.alpha = 0.6;
+        //       return material;
+        //     }`
+        //   },
+          
+        // }),
+        // vertexShaderSource: document.getElementById('vertexShaderSource')!.textContent as string,
+        // fragmentShaderSource: document.getElementById('fragmentShaderSource')!.textContent as string,
+        
+        // renderState: {
+        //   depthTest: {
+        //     enabled: true
+        //   }
+        // }
+      // }),
+      // shadows: Cesium.ShadowMode.CAST_ONLY,
       // releaseGeometryInstances: false,
       asynchronous: false
     })
@@ -187,35 +200,43 @@ const loadPrimitives = (extractNodes, accessorsData, viewer) => {
   return { primitives, cachedGeometryInstances }
 }
 
-const loadGeometryInstances = (geometry: Cesium.Geometry, translationData) => {
+const linearTransformAroundCenter = (
+  matrix: Cesium.Matrix4 | Cesium.Matrix3,
+  center: Cesium.Cartesian3,
+  result: Cesium.Matrix4
+) => {
+  const translationToCenter = Cesium.Matrix4.fromTranslation(center.clone())
+  const translationBack = Cesium.Matrix4.fromTranslation(
+    Cesium.Cartesian3.negate(center, new Cesium.Cartesian3())
+  )
+
+  Cesium.Matrix4.multiply(result, translationToCenter, result)
+  if (matrix instanceof Cesium.Matrix4) {
+    Cesium.Matrix4.multiply(result, matrix.clone(), result)
+  } else if (matrix instanceof Cesium.Matrix3) {
+    Cesium.Matrix4.multiplyByMatrix3(result, matrix.clone(), result)
+  }
+  Cesium.Matrix4.multiply(result, translationBack, result)
+}
+
+const loadGeometryInstances = (geometry: Cesium.Geometry, translationData, scaleData, rotationData) => {
   const count = translationData.length / 3
   const instances: Cesium.GeometryInstance[] = []
 
-  const translationAttribute = new Cesium.GeometryInstanceAttribute({
-    componentDatatype: Cesium.ComponentDatatype.FLOAT,
-    componentsPerAttribute: 4,
-    value: [1.0, 1.0, 1.0, 1.0]
-  })
   for (let i = 0; i < count; i++) {
     const translation = new Cesium.Cartesian3(translationData[i * 3], translationData[i * 3 + 1], translationData[i * 3 + 2])
     const translationMatrix = Cesium.Matrix4.fromTranslation(translation)
 
-    // const translationBack = Cesium.Matrix4.fromTranslation(Cesium.Cartesian3.negate(translation, new Cesium.Cartesian3()))
-    const rotationX = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(90))
-    const rotationZ = Cesium.Matrix3.fromRotationY(Cesium.Math.toRadians(90))
-    // const rotationMatrix = Cesium.Matrix4.fromRotationTranslation(rotationX)
+    const scale = new Cesium.Cartesian3(scaleData[i * 3], scaleData[i * 3 + 1], scaleData[i * 3 + 2])
+    const scaleMatrix = Cesium.Matrix4.fromScale(scale)
+
+    const quaternion = new Cesium.Quaternion(rotationData[i * 4], rotationData[i * 4 + 1], rotationData[i * 4 + 2], rotationData[i * 4 + 3])
+    const rotationMatrix = Cesium.Matrix3.fromQuaternion(quaternion)
 
     const modelMatrix = Cesium.Matrix4.IDENTITY.clone()
-    // Cesium.Matrix4.multiply(modelMatrix, rotationMatrix,  modelMatrix)
-    Cesium.Matrix4.multiplyByMatrix3(modelMatrix, rotationX, modelMatrix)
-    Cesium.Matrix4.multiplyByMatrix3(modelMatrix, rotationZ, modelMatrix)
     Cesium.Matrix4.multiply(modelMatrix, translationMatrix, modelMatrix)
-    // Cesium.Matrix4.multiply(modelMatrix, translationBack,  modelMatrix)
-
-    const matrixColumn0 = [modelMatrix[0], modelMatrix[4], modelMatrix[8], modelMatrix[12]];
-    const matrixColumn1 = [modelMatrix[1], modelMatrix[5], modelMatrix[9], modelMatrix[13]];
-    const matrixColumn2 = [modelMatrix[2], modelMatrix[6], modelMatrix[10], modelMatrix[14]];
-    const matrixColumn3 = [modelMatrix[3], modelMatrix[7], modelMatrix[11], modelMatrix[15]];
+    Cesium.Matrix4.multiplyByMatrix3(modelMatrix, rotationMatrix, modelMatrix)
+    Cesium.Matrix4.multiply(modelMatrix, scaleMatrix, modelMatrix)
 
     const instance = new Cesium.GeometryInstance({
       geometry: geometry,
@@ -223,54 +244,48 @@ const loadGeometryInstances = (geometry: Cesium.Geometry, translationData) => {
       id: i,
       attributes: {
         color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.BLUE),
-        // translation: Cesium.GeometryInstanceAttribute.fromCartesian3(translation)
-        show: new Cesium.ShowGeometryInstanceAttribute(true),
-        // 传递每个实例的模型矩阵（拆分成4列向量）
-        matrixColumn0: new Cesium.GeometryInstanceAttribute({
-          componentDatatype: Cesium.ComponentDatatype.FLOAT,
-          componentsPerAttribute: 4,
-          value: matrixColumn0
-        }),
-        matrixColumn1: new Cesium.GeometryInstanceAttribute({
-          componentDatatype: Cesium.ComponentDatatype.FLOAT,
-          componentsPerAttribute: 4,
-          value: matrixColumn1
-        }),
-        matrixColumn2: new Cesium.GeometryInstanceAttribute({
-          componentDatatype: Cesium.ComponentDatatype.FLOAT,
-          componentsPerAttribute: 4,
-          value: matrixColumn2
-        }),
-        matrixColumn3: new Cesium.GeometryInstanceAttribute({
-          componentDatatype: Cesium.ComponentDatatype.FLOAT,
-          componentsPerAttribute: 4,
-          value: matrixColumn3
-        }),
-        translation: translationAttribute,
+        show: new Cesium.ShowGeometryInstanceAttribute(true)
       }
     })
     instances.push(instance)
   }
 
-  console.log( Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.BLUE), translationAttribute, new Cesium.ShowGeometryInstanceAttribute(false), new Cesium.DistanceDisplayConditionGeometryInstanceAttribute(100.0, 10000.0));
 
   return instances
 }
 
 const loadNodes = (nodes, meshes) => {
-  const primitives: any = []
-  for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i];
-    const meshIndex = node.mesh;
-    const mesh = meshes[meshIndex];
-    const attributes = getNodeAttributes(node, mesh);
+  // const primitives: any = []
+  // for (let i = 0; i < nodes.length; i++) {
+  //   const node = nodes[i];
+  //   const meshIndex = node.mesh;
+  //   const mesh = meshes[meshIndex];
+  //   const attributes = getNodeAttributes(node, mesh);
+  //   const primitive = {
+  //     name: node.name,
+  //     // instanceCount: getInstanceCount(node),
+  //     attributes
+  //   }
+  //   primitives.push(primitive)
+  // }
+  // return primitives
+  const primitives = meshes.map((mesh, meshIndex) => {
+    const meshesInNode = nodes.filter(node => node.mesh === meshIndex)
+    const name = mesh.name || meshesInNode[0].name
+    const attributes = getMeshAttributes(mesh);
+    const matrixAttributes = getMatrixAttributes(meshesInNode);
     const primitive = {
-      name: node.name,
+      name,
       // instanceCount: getInstanceCount(node),
-      attributes
+      attributes: {
+        ...attributes,
+        ...matrixAttributes
+      }
     }
-    primitives.push(primitive)
-  }
+
+    return primitive
+  })
+
   return primitives
 }
 
@@ -290,6 +305,55 @@ const getNodeAttributes = (node, mesh) => {
       ...node.extensions.EXT_mesh_gpu_instancing.attributes
     }
   }
+  return attributes
+}
+
+const getMeshAttributes = (mesh) => {
+  
+  let attributes: any = {
+    ...mesh.primitives[0].attributes
+  }
+  attributes.indices = mesh.primitives[0].indices
+  attributes.material = mesh.primitives[0].material
+  return attributes
+}
+
+const getMatrixAttributes = (nodes) => {
+  const attributes: {
+    TRANSLATION: number[],
+    SCALE: number[],
+    ROTATION: number[]
+  } = {
+    TRANSLATION: [],
+    SCALE: [],
+    ROTATION: []
+  }
+  const translations: Cesium.Cartesian3[] = []
+  const scales: Cesium.Cartesian3[] = []
+  const rotations: number[] = []
+
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    const matrix = node.matrix ? Cesium.Matrix4.fromArray(node.matrix) : Cesium.Matrix4.IDENTITY.clone()
+
+    const translation = Cesium.Matrix4.getTranslation(matrix, new Cesium.Cartesian3())
+    translations.push(translation)
+
+    const scale = Cesium.Matrix4.getScale(matrix, new Cesium.Cartesian3())
+    scales.push(scale)
+
+    const rotation = Cesium.Matrix4.getRotation(matrix, new Cesium.Matrix3())
+    const quaternion = Cesium.Quaternion.fromRotationMatrix(rotation)
+    rotations.push(
+      ...Cesium.Quaternion.pack(quaternion, [])
+    )
+
+  }
+
+  attributes.TRANSLATION = Cesium.Cartesian3.packArray(translations, [])
+  attributes.SCALE = Cesium.Cartesian3.packArray(scales, [])
+  attributes.ROTATION = rotations
+
   return attributes
 }
 
