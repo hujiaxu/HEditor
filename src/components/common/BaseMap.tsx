@@ -70,6 +70,40 @@ const createPolygon = (positions?: Cesium.Cartesian3[], color = Cesium.Color.RED
   
 }
 
+const createShader = (height: number, upVector: Cesium.Cartesian3) => {
+  const customShader = new Cesium.CustomShader({
+    uniforms: {
+      u_flattenHeight: {
+        type: Cesium.UniformType.FLOAT,
+        value: height
+      },
+      u_upVector: {
+        type: Cesium.UniformType.VEC3,
+        value: upVector
+      }
+    },
+    varyings: {
+      v_selectedColor: Cesium.VaryingType.VEC4
+    },
+    vertexShaderText: `
+    void vertexMain(VertexInput vsInput, inout czm_modelVertexOutput vsOutput) {
+      vec3 normalEC = czm_normal * vsInput.attributes.normalMC;
+      vec3 positionMC = vsInput.attributes.positionMC;
+      mat3 m = czm_eastNorthUpToEyeCoordinates(positionMC, normalEC);
+      vec3 upInEye = m * u_upVector;
+      vec4 viewpos = (czm_modelView * vec4(vsInput.attributes.positionMC, 1.0));
+      vec3 viewposvec3=viewpos.xyz/viewpos.w;
+      vec3 outPos = viewposvec3 + upInEye;
+      vsOutput.positionMC = vec4(czm_inverseModelView * vec4(outPos, 1.0)).xyz;
+      vsOutput.positionMC.z = 1.0;
+    }
+      `,
+  });
+
+  return customShader
+}
+
+
 const BaseMap = () => {
   const [viewer] = useState<Cesium.Viewer>();
 
@@ -83,26 +117,20 @@ const BaseMap = () => {
 
       const tileset = await loadCesium3dTileset(viewer, tilesetUrl);
 
-      // flyToTarget(viewer, tileset);
+      tileset.style = undefined
 
-      const polygon = createPolygon()
-      if (viewer) {
-        const element = viewer.scene.primitives.add(polygon)
-        const boundingSphere = Cesium.BoundingSphere.fromPoints(pos)
+      const modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(tileset.boundingSphere.center)
 
-        new Transformer({
-          scene: viewer.scene,
-          element: tileset,
-          boundingSphere: tileset.boundingSphere
-        })
+      const modelMatrixInverse = Cesium.Matrix4.inverse(modelMatrix, new Cesium.Matrix4())
 
-        viewer.camera.flyToBoundingSphere(boundingSphere, {
-          duration: 1,
-          offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-30), 60),
-        })
-        // console.log(transformer)
+      const posInECEF = Cesium.Matrix4.multiplyByPoint(modelMatrixInverse, tileset.boundingSphere.center, new Cesium.Cartesian3())
+      const customShader = createShader(tileset.boundingSphere.center.z, viewer.scene.camera.up)
 
-      }
+      tileset.customShader = customShader
+
+
+      flyToTarget(viewer, tileset);
+
     };
     cb();
   }, [viewer]);
