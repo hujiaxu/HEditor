@@ -79,12 +79,10 @@ export const extractGltfData = async (name, viewer: Cesium.Viewer) => {
 
     accessorsData[i] = values;
   }
-  console.log('accessorsData: ', accessorsData);
 
   const extractNodes = loadNodes(nodes, meshes)
-  console.log('extractNodes: ', extractNodes);
 
-  return loadPrimitives(extractNodes, accessorsData, viewer)
+  return loadPrimitives(extractNodes, accessorsData, gltf)
 
 }
 
@@ -96,31 +94,7 @@ const setAttributes = (values: any, componentsPerAttribute: number, type: Cesium
   })
 }
 
-
-// const customMaterialType = 'MyCustomMaterial'
-
-// // 注册自定义材质
-// Cesium.Material..addMaterial(customMaterialType, {
-//   fabric: {
-//       type: customMaterialType,
-//       uniforms: {
-//           u_viewProjection: viewer.scene.camera.viewProjectionMatrix
-//       },
-//       // 自定义着色器代码
-//       source: `
-//           uniform mat4 u_viewProjection;
-
-//           varying vec3 v_positionEC;
-//           varying vec2 v_st;
-
-//           void main() {
-//               gl_FragColor = vec4(v_st, 0.5, 1.0);
-//           }
-//       `
-//   }
-// });
-
-const loadPrimitives = (extractNodes, accessorsData, viewer) => {
+const loadPrimitives = (extractNodes, accessorsData, originGltf) => {
 
   const primitives: Cesium.Primitive[] = []
   const cachedGeometryInstances: (Cesium.GeometryInstance[])[] = []
@@ -134,7 +108,7 @@ const loadPrimitives = (extractNodes, accessorsData, viewer) => {
     const translationData = attributes.TRANSLATION instanceof Array ? attributes.TRANSLATION : accessorsData[attributes.TRANSLATION]
     const scaleData = attributes.SCALE instanceof Array ? attributes.SCALE : accessorsData[attributes.SCALE]
     const rotationData = attributes.ROTATION instanceof Array ? attributes.ROTATION : accessorsData[attributes.ROTATION]
-
+    const nodes = extractNode.nodes
     const geometryAttribute: any = {
       position,
       normal
@@ -148,7 +122,7 @@ const loadPrimitives = (extractNodes, accessorsData, viewer) => {
       primitiveType: Cesium.PrimitiveType.TRIANGLES,
     })
 
-    const geometryInstances = loadGeometryInstances(geometry, translationData, scaleData, rotationData)
+    const geometryInstances = loadGeometryInstances(geometry, translationData, scaleData, rotationData, nodes)
 
     const primitive = new Cesium.Primitive({
       geometryInstances,
@@ -197,7 +171,7 @@ const loadPrimitives = (extractNodes, accessorsData, viewer) => {
     cachedGeometryInstances.push(geometryInstances)
   }
 
-  return { primitives, cachedGeometryInstances }
+  return { primitives, cachedGeometryInstances, originGltf }
 }
 
 const linearTransformAroundCenter = (
@@ -219,7 +193,7 @@ const linearTransformAroundCenter = (
   Cesium.Matrix4.multiply(result, translationBack, result)
 }
 
-const loadGeometryInstances = (geometry: Cesium.Geometry, translationData, scaleData, rotationData) => {
+const loadGeometryInstances = (geometry: Cesium.Geometry, translationData, scaleData, rotationData, nodes) => {
   const count = translationData.length / 3
   const instances: Cesium.GeometryInstance[] = []
 
@@ -241,7 +215,7 @@ const loadGeometryInstances = (geometry: Cesium.Geometry, translationData, scale
     const instance = new Cesium.GeometryInstance({
       geometry: geometry,
       modelMatrix,
-      id: i,
+      id: nodes[i].name,
       attributes: {
         color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.BLUE),
         show: new Cesium.ShowGeometryInstanceAttribute(true)
@@ -280,7 +254,8 @@ const loadNodes = (nodes, meshes) => {
       attributes: {
         ...attributes,
         ...matrixAttributes
-      }
+      },
+      nodes: meshesInNode
     }
 
     return primitive
