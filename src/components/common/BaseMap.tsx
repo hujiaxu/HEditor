@@ -70,20 +70,20 @@ const createPolygon = (positions?: Cesium.Cartesian3[], color = Cesium.Color.RED
   
 }
 
-const createShader = (height: number, ECEFToENU: Cesium.Matrix4, ENUToECEF: Cesium.Matrix4, inverseModelViewMatrix: Cesium.Matrix4) => {
+const createShader = (height: Cesium.Cartesian3, ECEFToENURTC: Cesium.Matrix4, ENUToENEFRTC: Cesium.Matrix4, inverseModelViewMatrix: Cesium.Matrix4) => {
   const customShader = new Cesium.CustomShader({
     uniforms: {
       u_flattenHeight: {
-        type: Cesium.UniformType.FLOAT,
+        type: Cesium.UniformType.VEC3,
         value: height
       },
-      u_ECEFToENU: {
+      u_ECEFToENU_RTC: {
         type: Cesium.UniformType.MAT4,
-        value: ECEFToENU
+        value: ECEFToENURTC
       },
-      u_ENUToECEF: {
+      u_ENUToECEF_RTC: {
         type: Cesium.UniformType.MAT4,
-        value: ENUToECEF
+        value: ENUToENEFRTC
       },
       u_inverseModelViewMatrix: {
         type: Cesium.UniformType.MAT4,
@@ -105,13 +105,19 @@ const createShader = (height: number, ECEFToENU: Cesium.Matrix4, ENUToECEF: Cesi
       vec3 positionMC = vsInput.attributes.positionMC;
       vec4 positionWC = czm_model * vec4(positionMC, 1.0);
       vec4 positionEC = czm_modelView * vec4(positionMC, 1.0);
+
+      vec4 flattenPos = czm_view *  vec4(u_flattenHeight, 1.);
       vec4 positionRelativeToEye = czm_modelViewRelativeToEye * vec4(positionMC, 1.0);
-      vec4 glPosition = czm_projection * positionRelativeToEye;
 
       // vec4 positionENU = u_ECEFToENU * czm_model * vec4(positionMC, 1.0);
       // vec4 flattenPos = vec4(positionENU.xy / positionENU.w, 1., 1.0);
       // vsOutput.positionMC = vec4(czm_inverseModel * u_ENUToECEF * flattenPos).xyz;
 
+      // vec4 positionENURTC = u_ECEFToENU_RTC * positionEC;
+      // vec4 flattenPos = vec4(positionENURTC.xy / positionENURTC.w, 1., 1.0);
+      // vsOutput.positionMC = vec4(czm_inverseModelView * u_ENUToECEF_RTC * flattenPos).xyz;
+
+      // positionEC.z = flattenPos.z; 
       vsOutput.positionMC = vec4(czm_inverseModelView * positionEC).xyz;
 
     }
@@ -137,6 +143,11 @@ const BaseMap = () => {
 
       tileset.style = undefined
 
+      const relativeToCamera = Cesium.Cartesian3.subtract(tileset.boundingSphere.center, viewer.camera.position, new Cesium.Cartesian3());
+
+      const ENUToENEFRTC = Cesium.Transforms.eastNorthUpToFixedFrame(relativeToCamera)
+      const ENEFToENURTC = Cesium.Matrix4.inverse(ENUToENEFRTC, new Cesium.Matrix4())
+
       const ENUToECEF = Cesium.Transforms.eastNorthUpToFixedFrame(tileset.boundingSphere.center)
       const ENUToECEFZero = Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.ZERO.clone())
 
@@ -145,7 +156,7 @@ const BaseMap = () => {
 
       var modelViewMatrix = viewer.camera.viewMatrix;  // 这是相机的视图矩阵
       var inverseModelViewMatrix = Cesium.Matrix4.inverse(modelViewMatrix, new Cesium.Matrix4())
-      const customShader = createShader(tileset.boundingSphere.center.z, ECEFToENU, ENUToECEF, inverseModelViewMatrix)
+      const customShader = createShader(tileset.boundingSphere.center, ENEFToENURTC, ENUToENEFRTC, inverseModelViewMatrix)
 
       tileset.customShader = customShader
 
