@@ -7,6 +7,12 @@ import React from "react";
 import Transformer from 'cesium-transformer';
 import { differenceBy } from 'lodash'
 // import SDK from "/@/sdk";
+import {GLBWriter, GLTFWriter, GLBLoader} from '@loaders.gl/gltf';
+import {encodeSync, encode, load} from '@loaders.gl/core';
+import {saveAs} from 'file-saver'
+import {Document, WebIO} from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+import ParseGlbData from "/@/hooks/parse/parseGlbData";
 
 const pos = [
   new Cesium.Cartesian3(
@@ -82,9 +88,7 @@ const BaseMap = () => {
 
   const boundingSphere = Cesium.BoundingSphere.fromPoints(pos)
   const modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(boundingSphere.center)
-  console.log('modelMatrix: ', modelMatrix);
   const modelMatrixInverse = Cesium.Matrix4.inverse(modelMatrix, new Cesium.Matrix4())
-  console.log('modelMatrixInverse: ', modelMatrixInverse);
 
   const rotationX = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(90))
   const rotationXInverse = Cesium.Matrix3.fromRotationX(Cesium.Math.toRadians(-90))
@@ -101,6 +105,9 @@ const BaseMap = () => {
         // const model = await loadModel(viewer, modelUrl, boundingSphere)
         // console.log('model: ', model);
         const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('electric', viewer);
+        // console.log('cachedGeometryInstances: ', cachedGeometryInstances);
+ 
+        // const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('edited-model', viewer);
         originGltfData = originGltf
         primitives.forEach(primitive => {
           primitive.modelMatrix = modelMatrix.clone()
@@ -117,7 +124,7 @@ const BaseMap = () => {
             const primitive = object.primitive as Cesium.Primitive
             const instanceAttributes = primitive.getGeometryInstanceAttributes(object.id as number)
             const pickId = object.id as number
-            const pickInstance = (cachedGeometryInstances[0] as Cesium.GeometryInstance[]).find(instance => instance.id === pickId)
+            const pickInstance = (cachedGeometryInstances.flat() as Cesium.GeometryInstance[]).find(instance => instance.id === pickId)
             const isExtiedElement = cachedElementsInstance.findIndex(instance => instance.id === pickId)
 
             const modelMatrix = isExtiedElement !== -1 ? elements[isExtiedElement].modelMatrix : primitive.modelMatrix.clone()
@@ -159,14 +166,12 @@ const BaseMap = () => {
         handler.setInputAction(({ position }) => {
           
           const object = viewer.scene.pick(position);
-          console.log('object: ', object);
           if (object && object.primitive instanceof Cesium.Primitive) {
             const primitive = object.primitive as Cesium.Primitive
             const pickId = object.id as number
             const instanceAttributes = primitive.getGeometryInstanceAttributes(object.id as number)
-            console.log('instanceAttributes: ', instanceAttributes.color, instanceAttributes.boundingSphere, instanceAttributes.show);
             instanceAttributes.show = Cesium.ShowGeometryInstanceAttribute.toValue(false)
-            const pickInstance = (cachedGeometryInstances[0] as Cesium.GeometryInstance[]).find(instance => instance.id === pickId)
+            const pickInstance = (cachedGeometryInstances[0].flat() as Cesium.GeometryInstance[]).find(instance => instance.id === pickId)
 
             deleteInstances.push(pickInstance!)
           }
@@ -183,9 +188,19 @@ const BaseMap = () => {
   }, [viewer]);
 
 
-  const saveFile = () => {
+  const saveFile = async () => {
+
+        // const modelUrl = await getModelUrl('electric');
+        
+
+        // new ParseGlbData({
+        //   url: modelUrl
+        // })
+        // const glb = await io.writeBinary(document);
+        // console.log('glb: ', glb);
+        // saveAs(new Blob([glb]), 'edited-model.glb');
+
     elements.forEach(element => {
-      console.log('element: ', element);
       const matrix = Cesium.Matrix4.IDENTITY.clone()
       Cesium.Matrix4.multiplyByMatrix3(
         matrix,
@@ -209,12 +224,58 @@ const BaseMap = () => {
       )
       const id = (element.geometryInstances as Cesium.GeometryInstance).id
       const targetNode = originGltfData.json.nodes.find(node => node.name === id)
-      console.log('targetNode: ', targetNode.matrix, Cesium.Matrix4.toArray(matrix, []));
       if (targetNode) {
         targetNode.matrix = Cesium.Matrix4.toArray(matrix, [])
       }
+
     })
-    console.log(cachedElementsInstance, deleteInstances, elements, originGltfData);
+
+    const nodesWithChildren = originGltfData.json.nodes.filter(node => node.children?.length)
+
+    deleteInstances.forEach((instance, idx) => {
+      const id = (instance as Cesium.GeometryInstance).id
+      console.log('id: ', id);
+      const deleteIndex = originGltfData.json.nodes.findIndex(node => node.name === id)
+      console.log('deleteIndex: ', deleteIndex);
+      if (deleteIndex !== -1) {
+        const deleteNode = (originGltfData.json.nodes as []).splice(deleteIndex, 1)
+        console.log('deleteNode: ', deleteNode);
+        for (const node of nodesWithChildren) {
+          if (node.children?.includes(deleteIndex + idx)) {
+            node.children = node.children?.filter(index => index !== deleteIndex + idx)
+          }
+          node.children = node.children?.map(index => index < deleteIndex + idx ? index : index - 1)
+        }
+        // nodesWithChildren.forEach(nodeWithChildren => {
+
+        // })
+      }
+    })
+
+    console.log('originGltfData: ', originGltfData);
+    // const arrayBuffer = await encode(originGltfData, GLBWriter, {
+    //   glb: originGltfData
+    // });
+    // saveAs(new Blob([arrayBuffer]), 'edited-model.glb');
+ 
+    // const gltfJson = JSON.stringify(originGltfData.json, null, 2);
+    // const gltfBlob = new Blob([gltfJson], {type: 'application/json'});
+    // console.log('gltfBlob: ', gltfBlob);
+    // saveAs(gltfBlob, 'model.gltf');
+
+    const jsonDocument = {
+      json: originGltfData.json,
+      resources: {}
+    }
+    const io = new WebIO();
+    const document = await io.readJSON(jsonDocument);
+    const glb = await io.writeBinary(document);
+    // const glb = await io.readBinary(gltfBlob);
+    console.log('glb: ', glb);
+    // console.log('originGltfData.json: ', JSON.stringify(originGltfData.json));
+
+    // 将生成的 GLB 文件保存（例如使用 FileSaver.js 保存）
+    saveAs(new Blob([glb], {type: 'application/octet-stream'}), 'edited-model.glb');
   }
 
   return <div id="cesiumContainer" className="w-full h-full">

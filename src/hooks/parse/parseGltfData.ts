@@ -12,6 +12,18 @@ function arrayBufferToBase64(buffer, byteOffset, byteLength) {
   }
   return btoa(binary);
 }
+function arrayBufferToBinaryString(buffer) {
+  // 创建一个 Uint8Array 视图来访问 ArrayBuffer 的每个字节
+  const uint8Array = new Uint8Array(buffer);
+
+  // 遍历每个字节，将其转换为字符并连接成字符串
+  let binaryString = '';
+  for (let i = 0; i < uint8Array.length; i++) {
+      binaryString += String.fromCharCode(uint8Array[i]);
+  }
+
+  return binaryString;
+}
 
 export const extractGltfData = async (name, viewer: Cesium.Viewer) => {
   // const gltf = JSON.parse(fs.readFileSync(inputFilePath));
@@ -28,9 +40,23 @@ export const extractGltfData = async (name, viewer: Cesium.Viewer) => {
   const meshes = processedGltf.meshes;
   const nodes = processedGltf.nodes;
   const binChunks = gltf.binChunks;
+  const buffers = processedGltf.buffers;
 
   // const vertexAttributes = {};
   const accessorsData: number[][] = []
+
+  for (let i = 0; i < binChunks.length; i++) {
+
+    const binChunk = binChunks[i];
+    console.log('binChunk: ', binChunk);
+    const binChunkByteOffset = binChunk.byteOffset || 0;
+    const binChunkByteLength = binChunk.byteLength;
+
+    const bufferData = binChunk.arrayBuffer.slice(binChunkByteOffset, binChunkByteOffset + binChunkByteLength);
+
+    buffers[i].uri = 'data:application/gltf-buffer;base64,' + arrayBufferToBase64(bufferData, 0, bufferData.byteLength);
+  }
+  console.log(buffers);
 
   for (let i = 0; i < accessors.length; i++) {
     const accessor = accessors[i];
@@ -309,6 +335,12 @@ const getMatrixAttributes = (nodes) => {
 
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
+    if (node.rotation && node.scale && node.translation) {
+      translations.push(new Cesium.Cartesian3(node.translation[0], node.translation[1], node.translation[2]))
+      scales.push(new Cesium.Cartesian3(node.scale[0], node.scale[1], node.scale[2]))
+      rotations.push(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3])
+      continue
+    }
     const matrix = node.matrix ? Cesium.Matrix4.fromArray(node.matrix) : Cesium.Matrix4.IDENTITY.clone()
 
     const translation = Cesium.Matrix4.getTranslation(matrix, new Cesium.Cartesian3())
