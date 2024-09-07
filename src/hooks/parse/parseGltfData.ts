@@ -3,8 +3,87 @@ import { load } from '@loaders.gl/core';
 import { GLBLoader } from '@loaders.gl/gltf';
 import * as Cesium from 'cesium'
 
+
+const parseGlb = async (arrayBuffer) => {
+  return new Promise((resolve, reject) => {
+
+    const dataView = new DataView(arrayBuffer);
+
+    // 1. 解析 Header (20 bytes)
+    const magic = dataView.getUint32(0, true); // 0x676C5446 ('glTF')
+    const version = dataView.getUint32(4, true); // 2
+    const totalLength = dataView.getUint32(8, true); // Total file length
+
+    console.log(`GLB Version: ${version}, Total Length: ${totalLength} bytes`);
+
+    const jsonChunkLength = dataView.getUint32(12, true); // Length of JSON chunk
+    const jsonChunkType = dataView.getUint32(16, true); // Type 'JSON' (0x4E4F534A)
+
+    if (jsonChunkType !== 0x4E4F534A) {
+      reject('The first chunk is not a JSON chunk');
+      return;
+    }
+
+    const jsonChunkData = new Uint8Array(arrayBuffer, 20, jsonChunkLength);
+    const jsonText = new TextDecoder().decode(jsonChunkData);
+    const json = JSON.parse(jsonText);
+
+    const binaryChunkHeaderOffset = 20 + jsonChunkLength;
+    if (binaryChunkHeaderOffset < totalLength) {
+      const binaryChunkLength = dataView.getUint32(binaryChunkHeaderOffset, true);
+      const binaryChunkType = dataView.getUint32(binaryChunkHeaderOffset + 4, true); // Type 'BIN' (0x004E4942)
+
+      if (binaryChunkType !== 0x004E4942) {
+        reject('The second chunk is not a binary chunk');
+        return;
+      }
+
+      const binChunk =
+      {
+        byteLength: binaryChunkLength,
+        byteOffset: binaryChunkHeaderOffset + 8,
+        type: 'bin',
+        arrayBuffer,
+        binBuffer: arrayBuffer.slice(binaryChunkHeaderOffset + 8, binaryChunkHeaderOffset + 8 + binaryChunkLength)
+      }
+      const header = {
+        byteLength: totalLength,
+        byteOffset: 0,
+        hasBinChunk: true
+      }
+
+      resolve({ json, binChunk, version, header });
+
+    }
+  })
+}
+const readGlb = async (url: string): Promise<{
+  json: any;
+  binChunk: any;
+  version: number
+}> => {
+  return new Promise(async (resolve, reject) => {
+
+    const response = await fetch(url);
+    const blob = await response.blob();
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      if (!e.target) return
+      const arrayBuffer = e.target.result;
+      parseGlb(arrayBuffer)
+        .then((res) => {
+          resolve(res as any)
+        })
+        .catch((err) => {
+          reject(err)
+        })
+    };
+    reader.readAsArrayBuffer(blob);
+  })
+}
 // 将ArrayBuffer转换为Base64
-function arrayBufferToBase64(buffer, byteOffset, byteLength) {
+const arrayBufferToBase64 = (buffer, byteOffset, byteLength) => {
   const bytes = new Uint8Array(buffer, byteOffset, byteLength);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
@@ -12,60 +91,28 @@ function arrayBufferToBase64(buffer, byteOffset, byteLength) {
   }
   return btoa(binary);
 }
-function arrayBufferToBinaryString(buffer) {
-  // 创建一个 Uint8Array 视图来访问 ArrayBuffer 的每个字节
-  const uint8Array = new Uint8Array(buffer);
-
-  // 遍历每个字节，将其转换为字符并连接成字符串
-  let binaryString = '';
-  for (let i = 0; i < uint8Array.length; i++) {
-      binaryString += String.fromCharCode(uint8Array[i]);
-  }
-
-  return binaryString;
-}
 
 export const extractGltfData = async (name, viewer: Cesium.Viewer) => {
   // const gltf = JSON.parse(fs.readFileSync(inputFilePath));
   // const { gltf: processedGltf } = await gltfPipeline.processGltf(gltf);
 
   const modelUrl = await getModelUrl(name)
-  const gltf = await load(modelUrl, GLBLoader);
+
+  const gltf = await readGlb(modelUrl);
 
   const processedGltf = gltf.json
-  console.log('gltf: ', gltf);
   console.log('processedGltf: ', processedGltf);
   const accessors = processedGltf.accessors;
   const bufferViews = processedGltf.bufferViews;
   const meshes = processedGltf.meshes;
   const nodes = processedGltf.nodes;
-  const binChunks = gltf.binChunks;
-  const buffers = processedGltf.buffers;
-
-  // const vertexAttributes = {};
+  const binChunk = gltf.binChunk;
   const accessorsData: number[][] = []
-
-  for (let i = 0; i < binChunks.length; i++) {
-
-    const binChunk = binChunks[i];
-    console.log('binChunk: ', binChunk);
-    const binChunkByteOffset = binChunk.byteOffset || 0;
-    const binChunkByteLength = binChunk.byteLength;
-
-    const bufferData = binChunk.arrayBuffer.slice(binChunkByteOffset, binChunkByteOffset + binChunkByteLength);
-
-    buffers[i].uri = 'data:application/gltf-buffer;base64,' + arrayBufferToBase64(bufferData, 0, bufferData.byteLength);
-  }
-  console.log(buffers);
 
   for (let i = 0; i < accessors.length; i++) {
     const accessor = accessors[i];
     const bufferView = bufferViews[accessor.bufferView];
-    const bufferIndex = bufferView.buffer;
-    const binChunk = binChunks[bufferIndex];
 
-
-    // 确保我们从正确的 binChunk 中提取数据
     const binChunkByteOffset = binChunk.byteOffset || 0;
     const binChunkByteLength = binChunk.byteLength || binChunk.byteLength;
 
@@ -82,7 +129,6 @@ export const extractGltfData = async (name, viewer: Cesium.Viewer) => {
       for (let k = 0; k < numComponents; k++) {
         const componentOffset = elementOffset + k * componentSize;
 
-        // 如果超出当前 binChunk 的范围，跳过不合法的数据
         if (componentOffset + componentSize > binChunkByteOffset + binChunkByteLength) {
           console.error(`Attempt to read outside of the buffer range. Skipping.`);
           break;
@@ -135,9 +181,47 @@ const loadPrimitives = (extractNodes, accessorsData, originGltf) => {
     const scaleData = attributes.SCALE instanceof Array ? attributes.SCALE : accessorsData[attributes.SCALE]
     const rotationData = attributes.ROTATION instanceof Array ? attributes.ROTATION : accessorsData[attributes.ROTATION]
     const nodes = extractNode.nodes
+
+    const material = originGltf.json.materials[attributes.material].pbrMetallicRoughness
+
+    const materialColor = material.baseColorFactor ? material.baseColorFactor : [1, 1, 1, 1]
+
+    const baseColor = new Cesium.Color(materialColor[0], materialColor[1], materialColor[2], materialColor[3])
+    const metallicColor = Cesium.Color.add(
+      Cesium.Color.multiplyByScalar(
+        new Cesium.Color(0.04, 0.04, 0.04, 1),
+        1.0 - material.metallicFactor,
+        new Cesium.Color()
+      ),
+      Cesium.Color.multiplyByScalar(
+        baseColor,
+        material.metallicFactor,
+        new Cesium.Color()
+      ),
+      new Cesium.Color()
+    )
+    const roughnessColor = Cesium.Color.lerp(
+      new Cesium.Color(1, 1, 1, 1),
+      new Cesium.Color(0.5, 0.5, 0.5, 1),
+      material.roughnessFactor,
+      new Cesium.Color()
+    )
+    const finalColor = Cesium.Color.multiply(metallicColor, roughnessColor, new Cesium.Color())
+    // console.log('materialColor: ', materialColor);
+
+    // const color = setAttributes(new Uint8Array([
+
+    //   Cesium.Color.floatToByte(c.red),
+    //   Cesium.Color.floatToByte(c.green),
+    //   Cesium.Color.floatToByte(c.blue),
+    //   Cesium.Color.floatToByte(c.alpha)
+
+    // ]), 4, Cesium.ComponentDatatype.UNSIGNED_BYTE)
+    // color.normalize = true
     const geometryAttribute: any = {
       position,
-      normal
+      normal,
+      // color
     }
 
 
@@ -148,46 +232,53 @@ const loadPrimitives = (extractNodes, accessorsData, originGltf) => {
       primitiveType: Cesium.PrimitiveType.TRIANGLES,
     })
 
-    const geometryInstances = loadGeometryInstances(geometry, translationData, scaleData, rotationData, nodes)
+    const geometryInstances = loadGeometryInstances(geometry, translationData, scaleData, rotationData, nodes, finalColor)
 
     const primitive = new Cesium.Primitive({
       geometryInstances,
-      appearance: new Cesium.PerInstanceColorAppearance({
-        flat: true,
+      // appearance: new Cesium.PerInstanceColorAppearance({
+      //   flat: true,
+      //   renderState: {
+      //     depthTest: {
+      //       enabled: true
+      //     }
+      //   }
+      // }),
+      appearance: new Cesium.MaterialAppearance({
+        material: new Cesium.Material({
+          fabric: {
+            // type: 'Color',
+            // type: 'PolylinePulseLink',
+            uniforms: {
+              u_color: baseColor,
+              u_roughnessFactor: material.roughnessFactor,
+              u_metallicFactor: material.metallicFactor
+            },
+            source: `czm_material czm_getMaterial(czm_materialInput materialInput) {
+            czm_material material = czm_getDefaultMaterial(materialInput);
+            float metalness = clamp(u_metallicFactor, 0.0, 1.0);
+            float roughness = clamp(u_roughnessFactor, 0.04, 1.0);
+            const vec3 REFLECTANCE_DIELECTRIC = vec3(0.04);
+            vec3 f0 = mix(REFLECTANCE_DIELECTRIC, u_color.rgb, metalness);
+            // material.specular = f0;
+
+            material.diffuse = mix(u_color.rgb, vec3(0.0), metalness);
+        
+            // material.roughness = roughness * roughness;
+            return material;
+          }`
+          },
+
+        }),
+        // vertexShaderSource: document.getElementById('vertexShaderSource')!.textContent as string,
+        // fragmentShaderSource: document.getElementById('fragmentShaderSource')!.textContent as string,
+
         renderState: {
           depthTest: {
             enabled: true
           }
         }
       }),
-      // appearance: new Cesium.MaterialAppearance({
-        // material: new Cesium.Material({
-        //   fabric: {
-        //     type: 'Color',
-        //     // type: 'PolylinePulseLink',
-        //     uniforms: {
-        //       color: Cesium.Color.BLUE
-        //     },
-        //     source: `czm_material czm_getMaterial(czm_materialInput materialInput) {
-        //       czm_material material = czm_getDefaultMaterial(materialInput);
-        //       material.diffuse = vec3(0.8, 0.2, 0.1);
-        //       material.specular = 3.0;
-        //       material.shininess = 0.8;
-        //       material.alpha = 0.6;
-        //       return material;
-        //     }`
-        //   },
-          
-        // }),
-        // vertexShaderSource: document.getElementById('vertexShaderSource')!.textContent as string,
-        // fragmentShaderSource: document.getElementById('fragmentShaderSource')!.textContent as string,
-        
-        // renderState: {
-        //   depthTest: {
-        //     enabled: true
-        //   }
-        // }
-      // }),
       // shadows: Cesium.ShadowMode.CAST_ONLY,
       // releaseGeometryInstances: false,
       asynchronous: false
@@ -219,7 +310,7 @@ const linearTransformAroundCenter = (
   Cesium.Matrix4.multiply(result, translationBack, result)
 }
 
-const loadGeometryInstances = (geometry: Cesium.Geometry, translationData, scaleData, rotationData, nodes) => {
+const loadGeometryInstances = (geometry: Cesium.Geometry, translationData, scaleData, rotationData, nodes, color) => {
   const count = translationData.length / 3
   const instances: Cesium.GeometryInstance[] = []
 
@@ -243,7 +334,7 @@ const loadGeometryInstances = (geometry: Cesium.Geometry, translationData, scale
       modelMatrix,
       id: nodes[i].name,
       attributes: {
-        color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.BLUE),
+        color: Cesium.ColorGeometryInstanceAttribute.fromColor(color),
         show: new Cesium.ShowGeometryInstanceAttribute(true)
       }
     })
@@ -287,6 +378,7 @@ const loadNodes = (nodes, meshes) => {
     return primitive
   })
 
+  console.log('primitives: ', primitives);
   return primitives
 }
 
@@ -310,7 +402,7 @@ const getNodeAttributes = (node, mesh) => {
 }
 
 const getMeshAttributes = (mesh) => {
-  
+
   let attributes: any = {
     ...mesh.primitives[0].attributes
   }
@@ -335,12 +427,6 @@ const getMatrixAttributes = (nodes) => {
 
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
-    if (node.rotation && node.scale && node.translation) {
-      translations.push(new Cesium.Cartesian3(node.translation[0], node.translation[1], node.translation[2]))
-      scales.push(new Cesium.Cartesian3(node.scale[0], node.scale[1], node.scale[2]))
-      rotations.push(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3])
-      continue
-    }
     const matrix = node.matrix ? Cesium.Matrix4.fromArray(node.matrix) : Cesium.Matrix4.IDENTITY.clone()
 
     const translation = Cesium.Matrix4.getTranslation(matrix, new Cesium.Cartesian3())

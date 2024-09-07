@@ -5,14 +5,8 @@ import { extractGltfData, flyToTarget, loadCesium3dTileset, loadModel } from "/@
 import { getModelUrl, getTilesetUrl } from "/@/utils/url";
 import React from "react";
 import Transformer from 'cesium-transformer';
-import { differenceBy } from 'lodash'
 // import SDK from "/@/sdk";
-import {GLBWriter, GLTFWriter, GLBLoader} from '@loaders.gl/gltf';
-import {encodeSync, encode, load} from '@loaders.gl/core';
-import {saveAs} from 'file-saver'
-import {Document, WebIO} from '@gltf-transform/core';
-import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import ParseGlbData from "/@/hooks/parse/parseGlbData";
+import { saveAs } from 'file-saver'
 
 const pos = [
   new Cesium.Cartesian3(
@@ -32,7 +26,7 @@ const pos = [
   )
 ]
 const createPolygon = (positions?: Cesium.Cartesian3[], color = Cesium.Color.RED) => {
-  
+
   if (!positions) {
     positions = pos
   }
@@ -74,7 +68,82 @@ const createPolygon = (positions?: Cesium.Cartesian3[], color = Cesium.Color.RED
   });
 
   return primitive
-  
+
+}
+
+
+const alignedLength = (value) => {
+  const alignValue = 4;
+  if (value == 0) {
+    return value;
+  }
+  const multiple = value % alignValue;
+  if (multiple === 0) {
+    return value;
+  }
+  return value + (alignValue - multiple);
+}
+
+const makeGlb = (glbObject) => {
+
+  var Binary = {
+    Magic: 0x46546C67
+  };
+
+  const enc = new TextEncoder();
+  const jsonBuffer = enc.encode(JSON.stringify(glbObject.json));
+  const jsonAlignedLength = alignedLength(jsonBuffer.length);
+  let padding;
+  if (jsonAlignedLength !== jsonBuffer.length) {
+
+    padding = jsonAlignedLength - jsonBuffer.length;
+  }
+  const totalSize = 12 + // file header: magic + version + length
+    8 + // json chunk header: json length + type
+    jsonAlignedLength +
+    8 + // bin chunk header: chunk length + type
+    glbObject.binChunk.byteLength;
+  const finalBuffer = new ArrayBuffer(totalSize);
+  const dataView = new DataView(finalBuffer);
+  let bufIndex = 0;
+  dataView.setUint32(bufIndex, Binary.Magic, true);
+  bufIndex += 4;
+  dataView.setUint32(bufIndex, 2, true);
+  bufIndex += 4;
+  dataView.setUint32(bufIndex, totalSize, true);
+  bufIndex += 4;
+  // JSON
+  dataView.setUint32(bufIndex, jsonAlignedLength, true);
+  bufIndex += 4;
+  dataView.setUint32(bufIndex, 0x4E4F534A, true);
+  bufIndex += 4;
+
+  for (var j = 0; j < jsonBuffer.length; j++) {
+    dataView.setUint8(bufIndex, jsonBuffer[j]);
+    bufIndex++;
+  }
+  if (padding !== undefined) {
+    for (var j = 0; j < padding; j++) {
+      dataView.setUint8(bufIndex, 0x20);
+      bufIndex++;
+    }
+  }
+
+  // BIN
+  dataView.setUint32(bufIndex, glbObject.binChunk.byteLength, true);
+  bufIndex += 4;
+  dataView.setUint32(bufIndex, 0x004E4942, true);
+  bufIndex += 4;
+
+  const buffer = new Uint8Array(glbObject.binChunk.binBuffer);
+  let bufoffset = bufIndex
+  var thisbufindex = bufoffset;
+  for (var j = 0; j < buffer.byteLength; j++) {
+    dataView.setUint8(thisbufindex, buffer[j]);
+    thisbufindex++;
+  }
+  saveAs(new Blob([finalBuffer], { type: 'model/json-binary' }), 'edited-model.glb');
+
 }
 
 const BaseMap = () => {
@@ -104,10 +173,10 @@ const BaseMap = () => {
         // const modelUrl = await getModelUrl('electric');
         // const model = await loadModel(viewer, modelUrl, boundingSphere)
         // console.log('model: ', model);
-        const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('electric', viewer);
+        // const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('electric', viewer);
         // console.log('cachedGeometryInstances: ', cachedGeometryInstances);
- 
-        // const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('edited-model', viewer);
+
+        const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('edited-model', viewer);
         originGltfData = originGltf
         primitives.forEach(primitive => {
           primitive.modelMatrix = modelMatrix.clone()
@@ -150,7 +219,7 @@ const BaseMap = () => {
 
               instanceAttributes.show = Cesium.ShowGeometryInstanceAttribute.toValue(false)
             }
-            
+
 
             if (transformer) {
               transformer.destory()
@@ -164,7 +233,7 @@ const BaseMap = () => {
           }
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
         handler.setInputAction(({ position }) => {
-          
+
           const object = viewer.scene.pick(position);
           if (object && object.primitive instanceof Cesium.Primitive) {
             const primitive = object.primitive as Cesium.Primitive
@@ -189,17 +258,6 @@ const BaseMap = () => {
 
 
   const saveFile = async () => {
-
-        // const modelUrl = await getModelUrl('electric');
-        
-
-        // new ParseGlbData({
-        //   url: modelUrl
-        // })
-        // const glb = await io.writeBinary(document);
-        // console.log('glb: ', glb);
-        // saveAs(new Blob([glb]), 'edited-model.glb');
-
     elements.forEach(element => {
       const matrix = Cesium.Matrix4.IDENTITY.clone()
       Cesium.Matrix4.multiplyByMatrix3(
@@ -234,48 +292,19 @@ const BaseMap = () => {
 
     deleteInstances.forEach((instance, idx) => {
       const id = (instance as Cesium.GeometryInstance).id
-      console.log('id: ', id);
       const deleteIndex = originGltfData.json.nodes.findIndex(node => node.name === id)
-      console.log('deleteIndex: ', deleteIndex);
       if (deleteIndex !== -1) {
-        const deleteNode = (originGltfData.json.nodes as []).splice(deleteIndex, 1)
-        console.log('deleteNode: ', deleteNode);
+        (originGltfData.json.nodes as []).splice(deleteIndex, 1)
         for (const node of nodesWithChildren) {
           if (node.children?.includes(deleteIndex + idx)) {
             node.children = node.children?.filter(index => index !== deleteIndex + idx)
           }
           node.children = node.children?.map(index => index < deleteIndex + idx ? index : index - 1)
         }
-        // nodesWithChildren.forEach(nodeWithChildren => {
-
-        // })
       }
     })
 
-    console.log('originGltfData: ', originGltfData);
-    // const arrayBuffer = await encode(originGltfData, GLBWriter, {
-    //   glb: originGltfData
-    // });
-    // saveAs(new Blob([arrayBuffer]), 'edited-model.glb');
- 
-    // const gltfJson = JSON.stringify(originGltfData.json, null, 2);
-    // const gltfBlob = new Blob([gltfJson], {type: 'application/json'});
-    // console.log('gltfBlob: ', gltfBlob);
-    // saveAs(gltfBlob, 'model.gltf');
-
-    const jsonDocument = {
-      json: originGltfData.json,
-      resources: {}
-    }
-    const io = new WebIO();
-    const document = await io.readJSON(jsonDocument);
-    const glb = await io.writeBinary(document);
-    // const glb = await io.readBinary(gltfBlob);
-    console.log('glb: ', glb);
-    // console.log('originGltfData.json: ', JSON.stringify(originGltfData.json));
-
-    // 将生成的 GLB 文件保存（例如使用 FileSaver.js 保存）
-    saveAs(new Blob([glb], {type: 'application/octet-stream'}), 'edited-model.glb');
+    makeGlb(originGltfData)
   }
 
   return <div id="cesiumContainer" className="w-full h-full">
