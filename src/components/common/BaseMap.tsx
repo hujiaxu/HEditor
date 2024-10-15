@@ -170,13 +170,21 @@ const BaseMap = () => {
       });
 
       if (viewer) {
-        // const modelUrl = await getModelUrl('electric');
+        // const modelUrl = await getModelUrl('texture_test');
         // const model = await loadModel(viewer, modelUrl, boundingSphere)
         // console.log('model: ', model);
-        // const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('electric', viewer);
-        // console.log('cachedGeometryInstances: ', cachedGeometryInstances);
 
-        const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('edited-model', viewer);
+        // viewer.camera.flyToBoundingSphere(boundingSphere, {
+        //   duration: 1,
+        //   offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-30), 60),
+        // })
+
+        // return 
+        const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('electric');
+        console.log('primitives: ', primitives);
+        // console.log('cachedGeometryInstances: ', cachedGeometryInstances);
+        // const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('edited-model', viewer);
+        // const { primitives, cachedGeometryInstances, originGltf } = await extractGltfData('texture_test');
         originGltfData = originGltf
         primitives.forEach(primitive => {
           primitive.modelMatrix = modelMatrix.clone()
@@ -187,6 +195,8 @@ const BaseMap = () => {
         })
 
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+        let transformer: Transformer | undefined = undefined
         handler.setInputAction(({ position }) => {
           const object = viewer.scene.pick(position);
           if (object && object.primitive instanceof Cesium.Primitive) {
@@ -220,16 +230,22 @@ const BaseMap = () => {
               instanceAttributes.show = Cesium.ShowGeometryInstanceAttribute.toValue(false)
             }
 
-
             if (transformer) {
               transformer.destory()
               transformer = undefined
             }
+
             transformer = new Transformer({
               scene: viewer.scene,
               element: element,
               boundingSphere: instanceAttributes.boundingSphere
             })
+          } else {
+
+            if (transformer) {
+              transformer.destory()
+              transformer = undefined
+            }
           }
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
         handler.setInputAction(({ position }) => {

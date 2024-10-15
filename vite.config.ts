@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import { resolve } from "path";
 import react from "@vitejs/plugin-react";
 import cesium from "vite-plugin-cesium";
+// import glsl from 'vite-plugin-glsl';
 
 function pathResolve(dir: string) {
   return resolve(process.cwd(), ".", dir);
@@ -13,7 +14,8 @@ export default defineConfig((configEnv) => {
   return {
     plugins: [
       react(),
-      cesium()
+      cesium(),
+      // glsl()
     ],
     server: {
       port: 3000,

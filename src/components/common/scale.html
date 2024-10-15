@@ -41,8 +41,18 @@
           halfSize, halfSize, -halfSize,
           -halfSize, halfSize, -halfSize
         ])
+        const st = [
+        0.0, 0.0,  // 顶点 0
+        1.0, 0.0,  // 顶点 1
+        1.0, 1.0,  // 顶点 2
+        0.0, 1.0,  // 顶点 3
+        0.0, 0.0,  // 顶点 4
+        1.0, 0.0,  // 顶点 5
+        1.0, 1.0,  // 顶点 6
+        0.0, 1.0   // 顶点 7
+      ];
         // console.log('boundingSphere: ', boundingSphere)
-      return new Cesium.Geometry({
+      let geometry = new Cesium.Geometry({
         attributes: {
           position: new Cesium.GeometryAttribute({
             componentDatatype: Cesium.ComponentDatatype.DOUBLE,
@@ -58,20 +68,26 @@
               -halfSize, halfSize, -halfSize
             ])
           }),
-          normal: new Cesium.GeometryAttribute({
+
+          st: new Cesium.GeometryAttribute({
             componentDatatype: Cesium.ComponentDatatype.FLOAT,
-            componentsPerAttribute: 3,
-            values: new Float32Array([
-              0, 0, 1,
-              0, 0, 1,
-              0, 0, 1,
-              0, 0, 1,
-              0, 0, -1,
-              0, 0, -1,
-              0, 0, -1,
-              0, 0, -1
-            ])
-          })
+            componentsPerAttribute: 2,
+            values: new Float32Array(st)
+          }),
+          // normal: new Cesium.GeometryAttribute({
+          //   componentDatatype: Cesium.ComponentDatatype.FLOAT,
+          //   componentsPerAttribute: 3,
+          //   values: new Float32Array([
+          //     0, 0, 1,
+          //     0, 0, 1,
+          //     0, 0, 1,
+          //     0, 0, 1,
+          //     0, 0, -1,
+          //     0, 0, -1,
+          //     0, 0, -1,
+          //     0, 0, -1
+          //   ])
+          // })
         },
         indices: new Uint16Array([
           0, 1, 2, 0, 2, 3,
@@ -84,6 +100,10 @@
         primitiveType: Cesium.PrimitiveType.TRIANGLES,
         boundingSphere
       });
+      geometry = Cesium.GeometryPipeline.computeNormal(geometry)
+      console.log('geometry: ', geometry);
+
+      return geometry
     }
 
 
@@ -103,17 +123,53 @@
       }
     });
 
+
+    const material = new Cesium.Material({
+        fabric: {
+          // type: 'Image',
+          uniforms: {
+            image: './yangguang.png',  // 这里填入你的贴图路径
+            repeat: new Cesium.Cartesian2(1, 1),
+          },
+          source: `czm_material czm_getMaterial(czm_materialInput materialInput) {
+            czm_material material = czm_getDefaultMaterial(materialInput);
+
+            vec2 st = materialInput.st;
+
+            vec3 normalEC = materialInput.normalEC;
+            vec3 up = vec3(0.0, 1.0, 0.0);
+            vec3 normalMC = czm_inverseNormal * normalEC;
+
+            vec4 diffuse = vec4(1.0, 1.0, 1.0, 1.0);
+
+            diffuse.rgb = texture(image, fract(repeat * materialInput.st)).rgb * diffuse.rgb;
+            diffuse.a = texture(image, fract(repeat * materialInput.st)).a * diffuse.a;
+
+            // if (dot(normalMC, up) < 0.0) {
+            //   diffuse = texture(image, st).rgba;
+            // }
+            // vec4 textureColor = texture(image, st).rgba;
+
+            // 法线向量
+            material.diffuse = diffuse.rgb;
+            // material.specular = 1.;
+            // material.normal = normal;
+            material.alpha = 1.;
+
+
+            return material;
+          }`
+        }
+      });
+
     // 创建 Primitive
     const primitive = new Cesium.Primitive({
       geometryInstances: geometryInstance,
-      appearance: new Cesium.PerInstanceColorAppearance({
-        flat: true,
-        renderState: {
-          depthTest: {
-            enabled: true
-          }
-        }
-      })
+      appearance: new Cesium.MaterialAppearance({
+          material: material,
+          flat: true,
+          faceForward: true
+        }),
     });
 
     // 将 Primitive 添加到场景中
@@ -151,7 +207,7 @@
       // Cesium.Matrix4.multiply(matrix, scaleMatrix, matrix);
       primitive.modelMatrix = matrix;
     }
-    viewer.clock.onTick.addEventListener(animate);
+    // viewer.clock.onTick.addEventListener(animate);
   </script>
 </body>
 

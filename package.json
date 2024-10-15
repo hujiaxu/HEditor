@@ -46,10 +46,8 @@
     "@gltf-transform/extensions": "^4.0.8",
     "@gltf-transform/functions": "^4.0.8",
     "@heroicons/react": "2.0.18",
-    "@loaders.gl/core": "^4.2.2",
-    "@loaders.gl/gltf": "^4.2.2",
     "axios": "^1.7.4",
-    "cesium": "^1.116.0",
+    "cesium": "^1.121.1",
     "cesium-transformer": "1.0.10",
     "cesiumvectortile": "^1.2.4",
     "dat.gui": "^0.7.9",
@@ -62,7 +60,8 @@
     "ol": "^8.2.0",
     "path": "^0.12.7",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "vite-plugin-glsl": "^1.3.0"
   },
   "devDependencies": {
     "@commitlint/cli": "17.4.2",
