@@ -43,7 +43,7 @@ export default async function mapviewInit({
     homeButton: true, // 是否显示首页按钮
     geocoder: false, // 默认不显示搜索栏地址
     sceneModePicker: false, // 是否显示视角切换按钮
-    requestRenderMode: true, //启用请求渲染模式
+    requestRenderMode:false, //启用请求渲染模式
     scene3DOnly: true, //每个几何实例将只能以3D渲染以节省GPU内存
     sceneMode: 3, //初始场景模式 1 2D模式 2 2D循环模式 3 3D模式  Cesium.SceneMode
   };

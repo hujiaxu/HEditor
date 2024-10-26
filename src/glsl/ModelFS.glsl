@@ -12,7 +12,20 @@ void main() {
     normalEC = faceforward(normalEC, vec3(0.0, 0.0, 1.0), -normalEC);
   #endif
 
-  vec4 textureColor = texture(image_0, vec2(v_st)).rgba;
+  czm_materialInput materialInput;
+  materialInput.normalEC=normalEC;
+  materialInput.positionToEyeEC=positionToEyeEC;
+  materialInput.st=v_st;
 
-  out_FragColor = vec4(textureColor.rgb, 1.);
+  czm_material material=czm_getMaterial(materialInput);
+
+  vec4 textureColor = texture(image_0, vec2(v_st)).rgba;
+  material.diffuse = czm_gammaCorrect(textureColor).rgb * vec3(1.0, 1.0, 1.0);
+  material.alpha = textureColor.a;
+
+  #ifdef FLAT
+  out_FragColor=vec4(material.diffuse+material.emission,material.alpha);
+  #else
+  out_FragColor=czm_phong(normalize(positionToEyeEC),material,czm_lightDirectionEC);
+  #endif
 }

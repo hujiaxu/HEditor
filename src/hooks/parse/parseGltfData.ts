@@ -1,9 +1,10 @@
 import { getModelUrl } from "/@/utils/url";
 import * as Cesium from 'cesium'
-import image from './yangguang.png'
+import image from './11.png'
 import image2 from './zhongqing.png'
 import ModelVSShader from '/@/glsl/ModelVS.glsl?raw'
 import ModelFSShader from '/@/glsl/ModelFS.glsl?raw'
+import { computeST } from "./computeST";
 
 
 const parseGlb = async (arrayBuffer) => {
@@ -95,7 +96,9 @@ export const extractGltfData = async (name) => {
   // const gltf = await readGlb('https://image-test.gwdenergy.com/design-storage/202408/17242940676041175487863220211712.glb');
   // const gltf = await readGlb('https://td-design.gwdenergy.com/design-storage/202409/17260469900551283367190711898112.glb');
   // const gltf = await readGlb('https://td-design.gwdenergy.com/design-storage/202409/17260487758731282708363410804736.glb');
-  const gltf = await readGlb(modelUrl);
+  // const gltf = await readGlb(modelUrl);
+
+  const gltf = await readGlb('https://image-test.gwdenergy.com/design-storage/202410/17289885357831139512043343581184.glb');
 
   const processedGltf = gltf.json
   console.log('processedGltf: ', processedGltf);
@@ -163,6 +166,10 @@ const setAttributes = (values: any, componentsPerAttribute: number, type: Cesium
     values: values
   })
 }
+function decimalToHexadecimal(decimalNumber: number): string {
+  return decimalNumber.toString(16).toUpperCase();
+}
+
 
 const loadPrimitives = (extractNodes, accessorsData, originGltf) => {
 
@@ -170,36 +177,28 @@ const loadPrimitives = (extractNodes, accessorsData, originGltf) => {
   const cachedGeometryInstances: (Cesium.GeometryInstance[])[] = []
 
   for (const extractNode of extractNodes) {
+    console.log('extractNode: ', extractNode);
     const attributes = extractNode.attributes
     const indices = new Uint16Array(accessorsData[attributes.indices])
     const position = setAttributes(new Float64Array(accessorsData[attributes.POSITION]), 3, Cesium.ComponentDatatype.DOUBLE) // attributes.POSITION
-    console.log('position: ', new Array(8).fill(1).map((_, index) => [position.values[index * 3], position.values[index * 3 + 1], position.values[index * 3 + 2]]));
     // const normal = setAttributes(new Float32Array(normalData), 3, Cesium.ComponentDatatype.FLOAT) // attributes.NORMAL
     const translationData = attributes.TRANSLATION instanceof Array ? attributes.TRANSLATION : accessorsData[attributes.TRANSLATION]
     const scaleData = attributes.SCALE instanceof Array ? attributes.SCALE : accessorsData[attributes.SCALE]
     const rotationData = attributes.ROTATION instanceof Array ? attributes.ROTATION : accessorsData[attributes.ROTATION]
     const nodes = extractNode.nodes
 
-    const stData = [
-      1.0, 1.0,  // 顶点 0
-      0.0, 1.0,  // 顶点 1
-      0.0, 1.0,  // 顶点 2
-      0.0, 0.0,  // 顶点 3
-      0.0, 1.0,  // 顶点 4
-      1.0, 1.0,  // 顶点 5
-      0.0, 0.0,  // 顶点 6
-      1.0, 0.0   // 顶点 7
-    ];
+    const typeTmp = decimalToHexadecimal(Number(extractNode.name))
 
-    const st = setAttributes(new Float32Array(stData), 2, Cesium.ComponentDatatype.FLOAT)
     const geometryAttribute: any = {
       position,
-      // normal,
-      // color
-      st
     }
 
-
+    if (typeTmp.startsWith('2101')) {
+      const stData = computeST(accessorsData[attributes.POSITION], accessorsData[attributes.indices])
+  
+      const st = setAttributes(new Float32Array(stData), 2, Cesium.ComponentDatatype.FLOAT)
+      geometryAttribute.st = st
+    }
     let geometry = new Cesium.Geometry({
       attributes: geometryAttribute,
       indices,
@@ -211,7 +210,7 @@ const loadPrimitives = (extractNodes, accessorsData, originGltf) => {
 
     const geometryInstances = loadGeometryInstances(geometry, translationData, scaleData, rotationData, nodes)
 
-    const primitive = loadPrimitive(geometryInstances)
+    const primitive = loadPrimitive(geometryInstances, typeTmp.startsWith('2101'))
 
     primitives.push(primitive)
     cachedGeometryInstances.push(geometryInstances)
@@ -220,78 +219,55 @@ const loadPrimitives = (extractNodes, accessorsData, originGltf) => {
   return { primitives, cachedGeometryInstances, originGltf }
 }
 
-const loadPrimitive = (geometryInstances) => {
+const loadPrimitive = (geometryInstances, isTexture) => {
 
   const imageHeight = 715
   const imageWidth = 328
 
+  const appearance = isTexture ? new Cesium.MaterialAppearance({
+    translucent: false,
+    material: new Cesium.Material({
+      fabric: {
+        // type: 'Image',
+        uniforms: {
+          image,
+          u_imageSize: new Cesium.Cartesian2(imageWidth, imageHeight),
+        },
+      },
+
+    }),
+    vertexShaderSource: ModelVSShader,
+    fragmentShaderSource: ModelFSShader,
+
+  }) : new Cesium.MaterialAppearance({
+    translucent: false,
+    material: new Cesium.Material({
+      fabric: {
+        type: 'Color',
+        uniforms: {
+          color: Cesium.Color.WHITE
+        },
+      },
+
+    }),
+    // vertexShaderSource: ModelVSShader,
+    // fragmentShaderSource: ModelFSShader,
+
+  })
+
+  const fragShader = appearance.getFragmentShaderSource()
+  console.log('fragShader: ', fragShader);
+
   return new Cesium.Primitive({
     geometryInstances,
-    appearance: new Cesium.MaterialAppearance({
-      translucent: false,
-      material: new Cesium.Material({
-        // minificationFilter: Cesium.TextureMinificationFilter.NEAREST,
-        // magnificationFilter: Cesium.TextureMagnificationFilter.NEAREST,
-        fabric: {
-          type: 'Image',
-          // type: 'PolylinePulseLink',
-          uniforms: {
-            // u_baseColor: Cesium.Cartesian4.fromArray(materialColor),
-            // u_roughness: material.roughnessFactor,
-            // u_metallic: material.metallicFactor,
-            image,
-            // image: image2,
-            u_imageSize: new Cesium.Cartesian2(imageWidth, imageHeight),
-            // repeat : {
-            //   x : 2,
-            //   y : 2
-            // }
-          },
-          // components : {
-          //   diffuse : 'texture(image, materialInput.st).rgb'
-          // }
-          // source: `czm_material czm_getMaterial(czm_materialInput materialInput) {
-          //   czm_material material = czm_getDefaultMaterial(materialInput);
-
-          //   vec2 st = materialInput.st;
-
-
-          //   vec4 positionMC = czm_inverseModelView * vec4(materialInput.positionToEyeEC, 1.0);
-
-          //   float textureX = mod(st.x, u_imageSize.x) / u_imageSize.x;
-          //   float textureY = mod(st.y, u_imageSize.y) / u_imageSize.y;
-
-          //   vec4 textureColor = texture(image, st).rgba;
-
-          //   float pi = 3.14159;
-          //   // 法线向量
-          //   vec3 normal = normalize(materialInput.normalEC);
-            
-          //   material.diffuse = textureColor.rgb;
-          //   // material.specular = 1.;
-          //   // material.normal = normal;
-          //   material.alpha = textureColor.a;
-
-
-          //   return material;
-          // }`
-        },
-
-      }),
-      vertexShaderSource: ModelVSShader,
-      fragmentShaderSource: ModelFSShader,
-
-      renderState: {
-        depthTest: {
-          enabled: true
-        }
-      }
-    }),
+    appearance,
     // shadows: Cesium.ShadowMode.CAST_ONLY,
     // releaseGeometryInstances: false,
-    asynchronous: false
+    asynchronous: false,
+    shadows: Cesium.ShadowMode.ENABLED
   })
 }
+
 
 const linearTransformAroundCenter = (
   matrix: Cesium.Matrix4 | Cesium.Matrix3,

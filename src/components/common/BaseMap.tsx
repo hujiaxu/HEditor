@@ -194,11 +194,15 @@ const BaseMap = () => {
           viewer.scene.primitives.add(primitive)
         })
 
+        const pointCollection = new Cesium.PointPrimitiveCollection()
+        viewer.scene.primitives.add(pointCollection)
+
         const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 
         let transformer: Transformer | undefined = undefined
         handler.setInputAction(({ position }) => {
           const object = viewer.scene.pick(position);
+          const pos = viewer.scene.pickPosition(position)
           if (object && object.primitive instanceof Cesium.Primitive) {
             const primitive = object.primitive as Cesium.Primitive
             const instanceAttributes = primitive.getGeometryInstanceAttributes(object.id as number)
@@ -215,6 +219,13 @@ const BaseMap = () => {
               )
               pickInstance!.modelMatrix = Cesium.Matrix4.IDENTITY.clone()
             }
+
+            pointCollection.add({
+              position: pos,
+              color: Cesium.Color.RED,
+              pixelSize: 10
+            })
+            return
             const element = isExtiedElement !== -1 ? elements[isExtiedElement] : new Cesium.Primitive({
               ...primitive,
               geometryInstances: pickInstance,
