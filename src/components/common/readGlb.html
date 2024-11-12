@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Read GLB</title>
+</head>
+<body>
+    <input type="file" id="glbInput" />
+    <script>
+        document.getElementById('glbInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const arrayBuffer = e.target.result;
+                    parseGlb(arrayBuffer);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+
+        function parseGlb(arrayBuffer) {
+            const dataView = new DataView(arrayBuffer);
+
+            // 1. 解析 Header (20 bytes)
+            const magic = dataView.getUint32(0, true); // 0x676C5446 ('glTF')
+            const version = dataView.getUint32(4, true); // 2
+            const totalLength = dataView.getUint32(8, true); // Total file length
+
+            // if (magic !== 0x676C5446) {
+            //     console.error('This is not a valid GLB file');
+            //     return;
+            // }
+
+            console.log(`GLB Version: ${version}, Total Length: ${totalLength} bytes`);
+
+            // 2. 解析 JSON Chunk (8 bytes header + JSON data)
+            const jsonChunkLength = dataView.getUint32(12, true); // Length of JSON chunk
+            const jsonChunkType = dataView.getUint32(16, true); // Type 'JSON' (0x4E4F534A)
+
+            if (jsonChunkType !== 0x4E4F534A) {
+                console.error('The first chunk is not a JSON chunk');
+                return;
+            }
+
+            // 获取 JSON 数据
+            const jsonChunkData = new Uint8Array(arrayBuffer, 20, jsonChunkLength);
+            const jsonText = new TextDecoder().decode(jsonChunkData);
+            const gltfJson = JSON.parse(jsonText);
+
+            console.log('Parsed glTF JSON:', gltfJson);
+
+            // 3. 解析 Binary Chunk (8 bytes header + binary data)（如果存在）
+            const binaryChunkHeaderOffset = 20 + jsonChunkLength;
+            if (binaryChunkHeaderOffset < totalLength) {
+                const binaryChunkLength = dataView.getUint32(binaryChunkHeaderOffset, true);
+                const binaryChunkType = dataView.getUint32(binaryChunkHeaderOffset + 4, true); // Type 'BIN' (0x004E4942)
+
+                if (binaryChunkType !== 0x004E4942) {
+                    console.error('The second chunk is not a binary chunk');
+                    return;
+                }
+
+                // 获取二进制数据
+                const binaryChunkData = new Uint8Array(arrayBuffer, binaryChunkHeaderOffset + 8, binaryChunkLength);
+                console.log('Parsed Binary Data:', binaryChunkData);
+            }
+        }
+    </script>
+</body>
+</html>
