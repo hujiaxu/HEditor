@@ -1,0 +1,9 @@
+{
+  "version": "v1",
+  "packages": {
+    "HEditor-engine": {
+      "signature": "d2bb1e0c6c9029fed6c153d292c727a4",
+      "pure": true
+    }
+  }
+}

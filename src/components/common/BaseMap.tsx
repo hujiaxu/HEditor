@@ -1,12 +1,10 @@
 import * as Cesium from "cesium";
 import { useEffect, useState } from "react";
 import initMap from "/@/hooks/initMap";
-import { extractGltfData, flyToTarget, loadCesium3dTileset, loadModel } from "/@/hooks";
-import { getModelUrl, getTilesetUrl } from "/@/utils/url";
+import { extractGltfData,  } from "/@/hooks";
 import React from "react";
 import Transformer from 'cesium-transformer';
 // import SDK from "/@/sdk";
-import { saveAs } from 'file-saver'
 
 const pos = [
   new Cesium.Cartesian3(
@@ -25,130 +23,11 @@ const pos = [
     2414184.688053879
   )
 ]
-const createPolygon = (positions?: Cesium.Cartesian3[], color = Cesium.Color.RED) => {
 
-  if (!positions) {
-    positions = pos
-  }
-  const modelMatrix = Cesium.Matrix4.IDENTITY.clone()
-  Cesium.Matrix4.multiply(
-    modelMatrix,
-    Cesium.Matrix4.fromTranslation(new Cesium.Cartesian3(0, 0, 0)),
-    modelMatrix
-  )
-  const polygonInstance = new Cesium.GeometryInstance({
-    geometry: new Cesium.PolygonGeometry({
-      polygonHierarchy: new Cesium.PolygonHierarchy(positions),
-      perPositionHeight: true,
-    }),
-    attributes: {
-      color: Cesium.ColorGeometryInstanceAttribute.fromColor(
-        color.withAlpha(0.3),
-      ),
-    },
-    // modelMatrix,
-    id: 'polygon',
-  });
-
-  const polygonAppearance = new Cesium.MaterialAppearance({
-    material:
-      Cesium.Material.fromType("Color", {
-        color:
-          color.withAlpha(0.3) ||
-          Cesium.Color.fromCssColorString("#00B20F"),
-      }),
-  });
-
-  const primitive = new Cesium.Primitive({
-    geometryInstances: polygonInstance,
-    appearance: polygonAppearance,
-    // depthFailAppearance: polygonAppearance,
-    releaseGeometryInstances: false,
-    // modelMatrix
-  });
-
-  return primitive
-
-}
-
-
-const alignedLength = (value) => {
-  const alignValue = 4;
-  if (value == 0) {
-    return value;
-  }
-  const multiple = value % alignValue;
-  if (multiple === 0) {
-    return value;
-  }
-  return value + (alignValue - multiple);
-}
-
-const makeGlb = (glbObject) => {
-
-  var Binary = {
-    Magic: 0x46546C67
-  };
-
-  const enc = new TextEncoder();
-  const jsonBuffer = enc.encode(JSON.stringify(glbObject.json));
-  const jsonAlignedLength = alignedLength(jsonBuffer.length);
-  let padding;
-  if (jsonAlignedLength !== jsonBuffer.length) {
-
-    padding = jsonAlignedLength - jsonBuffer.length;
-  }
-  const totalSize = 12 + // file header: magic + version + length
-    8 + // json chunk header: json length + type
-    jsonAlignedLength +
-    8 + // bin chunk header: chunk length + type
-    glbObject.binChunk.byteLength;
-  const finalBuffer = new ArrayBuffer(totalSize);
-  const dataView = new DataView(finalBuffer);
-  let bufIndex = 0;
-  dataView.setUint32(bufIndex, Binary.Magic, true);
-  bufIndex += 4;
-  dataView.setUint32(bufIndex, 2, true);
-  bufIndex += 4;
-  dataView.setUint32(bufIndex, totalSize, true);
-  bufIndex += 4;
-  // JSON
-  dataView.setUint32(bufIndex, jsonAlignedLength, true);
-  bufIndex += 4;
-  dataView.setUint32(bufIndex, 0x4E4F534A, true);
-  bufIndex += 4;
-
-  for (var j = 0; j < jsonBuffer.length; j++) {
-    dataView.setUint8(bufIndex, jsonBuffer[j]);
-    bufIndex++;
-  }
-  if (padding !== undefined) {
-    for (var j = 0; j < padding; j++) {
-      dataView.setUint8(bufIndex, 0x20);
-      bufIndex++;
-    }
-  }
-
-  // BIN
-  dataView.setUint32(bufIndex, glbObject.binChunk.byteLength, true);
-  bufIndex += 4;
-  dataView.setUint32(bufIndex, 0x004E4942, true);
-  bufIndex += 4;
-
-  const buffer = new Uint8Array(glbObject.binChunk.binBuffer);
-  let bufoffset = bufIndex
-  var thisbufindex = bufoffset;
-  for (var j = 0; j < buffer.byteLength; j++) {
-    dataView.setUint8(thisbufindex, buffer[j]);
-    thisbufindex++;
-  }
-  saveAs(new Blob([finalBuffer], { type: 'model/json-binary' }), 'edited-model.glb');
-
-}
 
 const BaseMap = () => {
   const [viewer] = useState<Cesium.Viewer>();
-  let transformer: Transformer | undefined = undefined
+  // let transformer: Transformer | undefined = undefined
   // const cachedGeometryInstances: Cesium.GeometryInstance[] = []
   let originGltfData: any
   const elements: Cesium.Primitive[] = []
@@ -225,7 +104,6 @@ const BaseMap = () => {
               color: Cesium.Color.RED,
               pixelSize: 10
             })
-            return
             const element = isExtiedElement !== -1 ? elements[isExtiedElement] : new Cesium.Primitive({
               ...primitive,
               geometryInstances: pickInstance,
