@@ -13,13 +13,13 @@ const HEditor = () => {
       console.log('viewer: ', viewer);
       const handler = new ScreenSpaceEventHandler(viewer.canvas)
 
-      for (const eventName in ScreenSpaceEventType) {
-        const type = ScreenSpaceEventType[eventName]
-        handler.setInputAction((event) => {
-          console.log('event: ' + eventName, event);
+      // for (const eventName in ScreenSpaceEventType) {
+      //   const type = ScreenSpaceEventType[eventName]
+      //   handler.setInputAction((event) => {
+      //     console.log('event: ' + eventName, event);
 
-        }, type)
-      }
+      //   }, type)
+      // }
       // handler.setInputAction((event) => {
       //   console.log('event: LEFT_DOWN', event);
 
@@ -37,7 +37,7 @@ const HEditor = () => {
       //   console.log('event: LEFT_DOUBLE_CLICK', event);
 
       // }, ScreenSpaceEventType.LEFT_DOUBLE_CLICK)
-      return viewer.scene.draw()
+      // return viewer.draw()
     }
     viewer = new Viewer({
       container: "editor-container",
