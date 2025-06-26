@@ -5,6 +5,7 @@ import { extractGltfData,  } from "/@/hooks";
 import React from "react";
 import Transformer from 'cesium-transformer';
 // import SDK from "/@/sdk";
+import { saveAs } from 'file-saver'
 
 const pos = [
   new Cesium.Cartesian3(
@@ -24,6 +25,81 @@ const pos = [
   )
 ]
 
+
+
+const alignedLength = (value) => {
+  const alignValue = 4;
+  if (value == 0) {
+    return value;
+  }
+  const multiple = value % alignValue;
+  if (multiple === 0) {
+    return value;
+  }
+  return value + (alignValue - multiple);
+}
+
+const makeGlb = (glbObject) => {
+
+  var Binary = {
+    Magic: 0x46546C67
+  };
+
+  const enc = new TextEncoder();
+  const jsonBuffer = enc.encode(JSON.stringify(glbObject.json));
+  const jsonAlignedLength = alignedLength(jsonBuffer.length);
+  let padding;
+  if (jsonAlignedLength !== jsonBuffer.length) {
+
+    padding = jsonAlignedLength - jsonBuffer.length;
+  }
+  const totalSize = 12 + // file header: magic + version + length
+    8 + // json chunk header: json length + type
+    jsonAlignedLength +
+    8 + // bin chunk header: chunk length + type
+    glbObject.binChunk.byteLength;
+  const finalBuffer = new ArrayBuffer(totalSize);
+  const dataView = new DataView(finalBuffer);
+  let bufIndex = 0;
+  dataView.setUint32(bufIndex, Binary.Magic, true);
+  bufIndex += 4;
+  dataView.setUint32(bufIndex, 2, true);
+  bufIndex += 4;
+  dataView.setUint32(bufIndex, totalSize, true);
+  bufIndex += 4;
+  // JSON
+  dataView.setUint32(bufIndex, jsonAlignedLength, true);
+  bufIndex += 4;
+  dataView.setUint32(bufIndex, 0x4E4F534A, true);
+  bufIndex += 4;
+
+  for (var j = 0; j < jsonBuffer.length; j++) {
+    dataView.setUint8(bufIndex, jsonBuffer[j]);
+    bufIndex++;
+  }
+  if (padding !== undefined) {
+    for (var j = 0; j < padding; j++) {
+      dataView.setUint8(bufIndex, 0x20);
+      bufIndex++;
+    }
+  }
+
+  // BIN
+  dataView.setUint32(bufIndex, glbObject.binChunk.byteLength, true);
+  bufIndex += 4;
+  dataView.setUint32(bufIndex, 0x004E4942, true);
+  bufIndex += 4;
+
+  const buffer = new Uint8Array(glbObject.binChunk.binBuffer);
+  let bufoffset = bufIndex
+  var thisbufindex = bufoffset;
+  for (var j = 0; j < buffer.byteLength; j++) {
+    dataView.setUint8(thisbufindex, buffer[j]);
+    thisbufindex++;
+  }
+  saveAs(new Blob([finalBuffer], { type: 'model/json-binary' }), 'edited-model.glb');
+
+}
 
 const BaseMap = () => {
   const [viewer] = useState<Cesium.Viewer>();
@@ -85,6 +161,7 @@ const BaseMap = () => {
           if (object && object.primitive instanceof Cesium.Primitive) {
             const primitive = object.primitive as Cesium.Primitive
             const instanceAttributes = primitive.getGeometryInstanceAttributes(object.id as number)
+            console.log('instanceAttributes: ', instanceAttributes);
             const pickId = object.id as number
             const pickInstance = (cachedGeometryInstances.flat() as Cesium.GeometryInstance[]).find(instance => instance.id === pickId)
             const isExtiedElement = cachedElementsInstance.findIndex(instance => instance.id === pickId)

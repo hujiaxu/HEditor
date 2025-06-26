@@ -255,8 +255,6 @@ const loadPrimitive = (geometryInstances, isTexture) => {
 
   })
 
-  const fragShader = appearance.getFragmentShaderSource()
-  console.log('fragShader: ', fragShader);
 
   return new Cesium.Primitive({
     geometryInstances,
@@ -312,7 +310,12 @@ const loadGeometryInstances = (geometry: Cesium.Geometry, translationData, scale
       modelMatrix,
       id: nodes[i].name,
       attributes: {
-        // color: Cesium.ColorGeometryInstanceAttribute.fromColor(color),
+        color: Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.WHITE),
+        column1: new Cesium.GeometryInstanceAttribute({
+          componentDatatype: Cesium.ComponentDatatype.FLOAT,
+          componentsPerAttribute: 3,
+          value: [1, 0, 0]
+        }),
         show: new Cesium.ShowGeometryInstanceAttribute(true)
       }
     })
