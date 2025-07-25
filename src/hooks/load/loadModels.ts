@@ -6,6 +6,7 @@ export const loadCesium3dTileset = async (
   url: string
 ) => {
   const tileset = await Cesium.Cesium3DTileset.fromUrl(url);
+  tileset.shadows = Cesium.ShadowMode.DISABLED;
   viewer.scene.primitives.add(tileset);
 
   const boundingSphere = tileset.boundingSphere;

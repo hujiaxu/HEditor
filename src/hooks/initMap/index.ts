@@ -51,6 +51,7 @@ export default async function mapviewInit({
   const viewer = new Cesium.Viewer(container, {
     ...baseConf,
     ...extendConf,
+    ...{ contextOptions:{ allowTextureFilterAnisotropic:false } },
   });
 
   viewer.scene.terrainProvider = new Cesium.EllipsoidTerrainProvider({});
