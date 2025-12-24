@@ -18,7 +18,7 @@ const BaseMapWith3dtiles = () => {
 
       if (viewer) {
 
-        const tilesUrl = await getTilesetUrl('GSY-2025062700002-0');
+        const tilesUrl = await getTilesetUrl('1324333894975492096');
         const tileset = await loadCesium3dTileset(viewer, tilesUrl);
 
         const center = tileset?.boundingSphere.center
@@ -31,20 +31,20 @@ const BaseMapWith3dtiles = () => {
                     }
                 `
             })
-            tileset.customShader = customShader
-            tileset.debugShowBoundingVolume = true;
-tileset.debugColorizeTiles = true;
+            // tileset.customShader = customShader
+            // tileset.debugShowBoundingVolume = true;
+// tileset.debugColorizeTiles = true;
         }
 
-        let transformer: Transformer | undefined = undefined
+        // let transformer: Transformer | undefined = undefined
 
         const boundingSphere = new Cesium.BoundingSphere(tileset.boundingSphere.center, 10)
         
-        transformer = new Transformer({
-          scene: viewer.scene,
-          element: tileset,
-          boundingSphere: boundingSphere
-        })
+        // transformer = new Transformer({
+        //   scene: viewer.scene,
+        //   element: tileset,
+        //   boundingSphere: boundingSphere
+        // })
 
         viewer.camera.flyToBoundingSphere(tileset.boundingSphere, {
           duration: 1,

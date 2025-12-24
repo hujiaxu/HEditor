@@ -7,6 +7,8 @@ export const loadCesium3dTileset = async (
 ) => {
   const tileset = await Cesium.Cesium3DTileset.fromUrl(url);
   tileset.shadows = Cesium.ShadowMode.DISABLED;
+  tileset.maximumScreenSpaceError = 512;
+tileset.preferLeaves            = false;
   viewer.scene.primitives.add(tileset);
 
   const boundingSphere = tileset.boundingSphere;
